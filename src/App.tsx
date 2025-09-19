@@ -1,0 +1,161 @@
+import { useEffect, useRef, useState } from "react";
+import axios from "axios";
+import { Line } from "react-chartjs-2";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import zoomPlugin from "chartjs-plugin-zoom";
+import "./App.css";
+import Graph from "./graph";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  zoomPlugin
+);
+
+function App() {
+  let indexForPoint = 0;
+  const [graphLabels, setGraphLabels] = useState<string[]>([]);
+  const [timeLabel, setTimeLabel] = useState<string>("");
+  const [graphData, setGraphData] = useState<any>({});
+  const [numberOfPointPerPage, setNumberOfPointsPerPage] = useState<number>(0);
+  const [points, setPoints] = useState<number[][]>([]);
+  const graphDataRef = useRef(graphData);
+  const indexRef = useRef(0);
+
+  const get_data = async () => {
+    try {
+      const res = await axios.get("http://127.0.0.1:8000/get_array/");
+
+      if (res.data) {
+        const newLabels: string[] = [];
+
+        setGraphData((prevData: any) => {
+          const tempData = { ...prevData };
+
+          for (const key in res.data) {
+            if (key.search("time") < 0) {
+              newLabels.push(key);
+
+              const ecg = res.data[key];
+              const ecg_time = res.data[`${key}_time`];
+
+              setNumberOfPointsPerPage(res.data[key].length);
+
+              if (Object.hasOwn(tempData, key)) {
+                tempData[key] = [...tempData[key], ...ecg];
+                // tempData[`${key}_time`] = [
+                //   ...tempData[`${key}_time`],
+                //   ...ecg_time,
+                // ];
+
+                let i = tempData[`${key}_time`].length;
+                tempData[`${key}_time`] = [
+                  ...tempData[`${key}_time`],
+                  ...ecg_time.map(() => {
+                    i += 1;
+                    return i;
+                  }),
+                ];
+              } else {
+                tempData[key] = ecg;
+                // tempData[`${key}_time`] = ecg_time;
+                let i = 0;
+                tempData[`${key}_time`] = ecg_time.map(() => {
+                  i += 1;
+                  return i;
+                });
+              }
+            } else {
+              setTimeLabel(key);
+            }
+          }
+
+          return tempData; // new reference each time
+        });
+
+        setGraphLabels(newLabels);
+      }
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  useEffect(() => {
+    get_data();
+    const interval = setInterval(() => {
+      get_data();
+    }, 1000); // fetch every second
+    return () => clearInterval(interval);
+  }, []);
+
+  const get_canvases = () => {
+    return points.map((row, idx) => (
+      <Graph key={idx} title={graphLabels[idx]} data={row} />
+    ));
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const latestData = graphDataRef.current; // ✅ always latest
+
+      const newPoints: number[][] = [];
+      let i = 0;
+
+      for (const key in latestData) {
+        if (key.includes("time")) continue;
+
+        console.log(indexRef.current);
+
+        const element = -latestData[key][indexRef.current];
+
+        console.log(key, element);
+
+        if (points.length > 0) {
+          newPoints.push([element, ...points[i]]);
+        } else {
+          newPoints.push([element]);
+        }
+
+        i++;
+      }
+
+      indexRef.current += 1;
+
+      setPoints(newPoints);
+    }, 10);
+
+    return () => clearInterval(interval);
+  }, [points, indexForPoint]);
+
+  // keep ref updated
+  useEffect(() => {
+    graphDataRef.current = graphData;
+  }, [graphData]);
+
+  return (
+    <div className="App" style={{ display: "grid" }}>
+      <h1>Realtime ECG</h1>
+      <div style={{ width: "90vw", display: "grid" }}>
+        {/* <Line style={{ width: "100%" }} data={data} options={options} /> */}
+        {/* <Graph data={tempData} /> */}
+        {get_canvases()}
+      </div>
+    </div>
+  );
+}
+
+export default App;
