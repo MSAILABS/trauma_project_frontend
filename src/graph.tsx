@@ -6,6 +6,7 @@ interface GraphParams {
 }
 
 const Graph = ({ title, data }: GraphParams) => {
+  const height = 250;
   const gridRef = useRef<HTMLCanvasElement | null>(null);
   const graphRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -48,7 +49,7 @@ const Graph = ({ title, data }: GraphParams) => {
     }
   }, []);
 
-  // ✅ Graph drawing (your original logic untouched)
+  // ✅ Graph drawing
   const draw = (
     context: CanvasRenderingContext2D | null | undefined,
     xSlider: number
@@ -68,9 +69,9 @@ const Graph = ({ title, data }: GraphParams) => {
     context.stroke();
 
     // ✅ scale factor for horizontal spacing
-    const xStep = width / 1000; // each point fits inside canvas width
+    const xStep = width / 1000; // adjust number of points shown
 
-    const delta = xSlider % width; // keep scrolling
+    const delta = xSlider % width;
     const color = "rgba(0, 255, 255, 1)";
 
     context.beginPath();
@@ -124,16 +125,19 @@ const Graph = ({ title, data }: GraphParams) => {
     return () => window.cancelAnimationFrame(animationId);
   }, [data]);
 
+  // ✅ Y axis ticks [-1, -0.5, 0, 0.5, 1]
+  const yTicks = [1, 0.5, 0, -0.5, -1];
+
   return (
     <div
       style={{
         position: "relative",
-        width: "100%",
-        height: "340px", // a bit taller for title
+        width: "90%",
+        height: `${height}px`, // taller for labels
         margin: "50px auto",
       }}
     >
-      {/* ✅ Title outside of canvas */}
+      {/* ✅ Title */}
       <div
         style={{
           position: "absolute",
@@ -149,28 +153,66 @@ const Graph = ({ title, data }: GraphParams) => {
         {title}
       </div>
 
-      {/* Grid canvas (bottom layer) */}
+      {/* ✅ Y-axis label (outside, left) */}
+      <div
+        style={{
+          position: "absolute",
+          top: "30px",
+          left: "-25px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "space-between",
+          marginRight: "8px",
+          height: `${height}px`,
+          color: "white",
+          fontSize: "10px",
+          fontWeight: "bold",
+        }}
+      >
+        {yTicks.map((val) => (
+          <div key={val} style={{}}>
+            {val}
+          </div>
+        ))}
+      </div>
+
+      {/* ✅ X-axis label (outside, bottom) */}
+      {/* <div
+        style={{
+          position: "absolute",
+          bottom: "-60px",
+          left: "50%",
+          transform: "translateX(-50%)",
+          fontSize: "14px",
+          fontWeight: "bold",
+          color: "white",
+        }}
+      >
+        X Axis
+      </div> */}
+
+      {/* Grid canvas */}
       <canvas
         ref={gridRef}
         style={{
           width: "100%",
-          height: "300px",
+          height: `${height}px`,
           position: "absolute",
-          top: 30, // leave space for title
+          top: 30,
           left: 0,
           zIndex: 1,
         }}
       />
 
-      {/* Graph canvas (top layer) */}
+      {/* Graph canvas */}
       <canvas
         ref={graphRef}
         id="graph_canvas"
         style={{
           width: "100%",
-          height: "300px",
+          height: `${height}px`,
           position: "absolute",
-          top: 30, // same offset
+          top: 30,
           left: 0,
           zIndex: 2,
           transform: "scaleX(-1)",
