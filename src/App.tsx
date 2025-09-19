@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
-import { Line } from "react-chartjs-2";
+// import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,6 +14,7 @@ import {
 import zoomPlugin from "chartjs-plugin-zoom";
 import "./App.css";
 import Graph from "./graph";
+import BeatButton from "./beatButton";
 
 ChartJS.register(
   CategoryScale,
@@ -35,6 +36,8 @@ function App() {
   const [points, setPoints] = useState<number[][]>([]);
   const graphDataRef = useRef(graphData);
   const indexRef = useRef(0);
+
+  const [isAnalysis, setIsAnalysis] = useState(false);
 
   const get_data = async () => {
     try {
@@ -147,13 +150,34 @@ function App() {
   }, [graphData]);
 
   return (
-    <div className="App" style={{ display: "grid" }}>
-      <h1>Realtime ECG</h1>
+    <div
+      style={{
+        display: "grid",
+        justifyContent: "center",
+        gap: "50px",
+        margin: "0px auto",
+        width: "95vw",
+      }}
+    >
+      <h1 style={{ marginBottom: "-20px" }}>Realtime ECG</h1>
       <div style={{ width: "90vw", display: "grid" }}>
         {/* <Line style={{ width: "100%" }} data={data} options={options} /> */}
         {/* <Graph data={tempData} /> */}
         {get_canvases()}
       </div>
+      {points.length > 0 &&
+        (isAnalysis ? (
+          <BeatButton
+            width={300}
+            color1="rgba(0, 187, 187, 1)"
+            color2="rgba(0, 139, 106, 1)"
+            beats={100}
+            label="Analysing Data"
+            speed={300}
+          />
+        ) : (
+          <button onClick={() => setIsAnalysis(!isAnalysis)}>Analyze</button>
+        ))}
     </div>
   );
 }
