@@ -70,7 +70,6 @@ const Graph = ({ title, data }: GraphParams) => {
 
     // ✅ scale factor for horizontal spacing
     const xStep = width / 1000; // adjust number of points shown
-
     const delta = xSlider % width;
     const color = "rgba(0, 255, 255, 1)";
 
@@ -79,13 +78,15 @@ const Graph = ({ title, data }: GraphParams) => {
     context.lineWidth = 2;
 
     if (data.length > 0) {
-      let prevX = delta;
-      let prevY = data[0] * 100 + height / 3;
+      // 🔄 Start at the RIGHT side instead of left
+      let prevX = width - delta;
+      let prevY = ((data[0] + 1) / 2) * height; // ✅ flipped (inverse Y)
       context.moveTo(prevX, prevY);
 
       for (let i = 1; i < data.length; i++) {
-        const currX = delta + i * xStep;
-        const currY = data[i] * 100 + height / 2.5;
+        // 🔄 Move to the left as i increases
+        const currX = width - (delta + i * xStep);
+        const currY = ((data[i] + 1) / 2) * height; // ✅ flipped (inverse Y)
 
         const midX = (prevX + currX) / 2;
         const midY = (prevY + currY) / 2;
@@ -215,7 +216,6 @@ const Graph = ({ title, data }: GraphParams) => {
           top: 30,
           left: 0,
           zIndex: 2,
-          transform: "scaleX(-1)",
         }}
       />
     </div>
