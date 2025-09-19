@@ -28,6 +28,7 @@ ChartJS.register(
 );
 
 function App() {
+  let numberOfPart = -1;
   let indexForPoint = 0;
   const [graphLabels, setGraphLabels] = useState<string[]>([]);
   const [timeLabel, setTimeLabel] = useState<string>("");
@@ -41,7 +42,9 @@ function App() {
 
   const get_data = async () => {
     try {
-      const res = await axios.get("http://127.0.0.1:8000/get_array/");
+      const res = await axios.get(
+        `http://127.0.0.1:8000/get_array/${numberOfPart}`
+      );
 
       if (res.data) {
         const newLabels: string[] = [];
@@ -49,7 +52,10 @@ function App() {
         setGraphData((prevData: any) => {
           const tempData = { ...prevData };
 
+          let isDataPresent = false;
+
           for (const key in res.data) {
+            isDataPresent = true;
             if (key.search("time") < 0) {
               newLabels.push(key);
 
@@ -87,6 +93,10 @@ function App() {
             }
           }
 
+          if (isDataPresent) {
+            numberOfPart++;
+          }
+
           return tempData; // new reference each time
         });
 
@@ -120,6 +130,12 @@ function App() {
 
       for (const key in latestData) {
         if (key.includes("time")) continue;
+
+        if (latestData[key].length > 0) {
+          if (indexRef.current > latestData[key].length) {
+            return;
+          }
+        }
 
         console.log(indexRef.current);
 
