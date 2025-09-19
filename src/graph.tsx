@@ -136,11 +136,14 @@ const Graph = ({ title, data }: GraphParams) => {
       {/* ✅ Title outside of canvas */}
       <div
         style={{
+          position: "absolute",
+          top: "-1em",
+          left: "46%",
           textAlign: "center",
-          fontSize: "18px",
+          fontSize: "2em",
           fontWeight: "bold",
           color: "white",
-          marginBottom: "8px",
+          marginBottom: "1em",
         }}
       >
         {title}
