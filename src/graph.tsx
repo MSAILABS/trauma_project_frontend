@@ -29,7 +29,7 @@ const Graph = ({ title, data }: GraphParams) => {
     context.strokeStyle = "rgba(200,200,200,0.3)";
     context.lineWidth = 1;
 
-    const gridSize = 40;
+    const gridSize = 20;
 
     // vertical lines
     for (let x = 0; x <= width; x += gridSize) {
@@ -60,14 +60,17 @@ const Graph = ({ title, data }: GraphParams) => {
 
     // --- White horizontal line at middle ---
     context.beginPath();
-    context.strokeStyle = "rgba(255,255,255,0.5)"; // strong white
+    context.strokeStyle = "rgba(255,255,255,0.5)";
     context.lineWidth = 2;
-    const midY = height / 2.5;
+    const midY = height / 2;
     context.moveTo(0, midY);
     context.lineTo(width, midY);
     context.stroke();
 
-    const delta = xSlider % 1000;
+    // ✅ scale factor for horizontal spacing
+    const xStep = width / 1000; // each point fits inside canvas width
+
+    const delta = xSlider % width; // keep scrolling
     const color = "rgba(0, 255, 255, 1)";
 
     context.beginPath();
@@ -80,8 +83,8 @@ const Graph = ({ title, data }: GraphParams) => {
       context.moveTo(prevX, prevY);
 
       for (let i = 1; i < data.length; i++) {
-        const currX = delta + i * 2;
-        const currY = data[i] * 100 + height / 3;
+        const currX = delta + i * xStep;
+        const currY = data[i] * 100 + height / 2.5;
 
         const midX = (prevX + currX) / 2;
         const midY = (prevY + currY) / 2;
