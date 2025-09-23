@@ -7,6 +7,7 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -15,12 +16,14 @@ import zoomPlugin from "chartjs-plugin-zoom";
 import "./App.css";
 import Graph from "./graph";
 import BeatButton from "./beatButton";
+import BarChat from "./barchat";
 
 ChartJS.register(
   CategoryScale,
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   Title,
   Tooltip,
   Legend,
@@ -137,11 +140,7 @@ function App() {
           }
         }
 
-        console.log(indexRef.current);
-
         const element = -latestData[key][indexRef.current];
-
-        console.log(key, element);
 
         if (points.length > 0) {
           newPoints.push([element, ...points[i]]);
@@ -194,6 +193,16 @@ function App() {
         ) : (
           <button onClick={() => setIsAnalysis(!isAnalysis)}>Analyze</button>
         ))}
+      <div
+        style={{
+          width: "90vw",
+          height: "400px",
+          display: "grid",
+          justifyContent: "center",
+        }}
+      >
+        <BarChat />
+      </div>
     </div>
   );
 }

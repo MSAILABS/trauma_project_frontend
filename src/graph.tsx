@@ -56,7 +56,7 @@ const Graph = ({ title, data }: GraphParams) => {
   ) => {
     if (!context) return;
 
-    const { width, height } = context.canvas;
+    const { width } = context.canvas;
     context.clearRect(0, 0, width, height);
 
     // --- White horizontal line at middle ---
