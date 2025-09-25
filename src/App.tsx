@@ -31,12 +31,16 @@ ChartJS.register(
 );
 
 function App() {
+  let interval;
   let numberOfPart = -1;
   let indexForPoint = 0;
+
+  const [patient, setPatient] = useState("");
+
   const [graphLabels, setGraphLabels] = useState<string[]>([]);
-  const [timeLabel, setTimeLabel] = useState<string>("");
+  // const [timeLabel, setTimeLabel] = useState<string>("");
   const [graphData, setGraphData] = useState<any>({});
-  const [numberOfPointPerPage, setNumberOfPointsPerPage] = useState<number>(0);
+  // const [numberOfPointPerPage, setNumberOfPointsPerPage] = useState<number>(0);
   const [points, setPoints] = useState<number[][]>([]);
   const graphDataRef = useRef(graphData);
   const indexRef = useRef(0);
@@ -46,8 +50,13 @@ function App() {
   const get_data = async () => {
     try {
       const res = await axios.get(
-        `http://127.0.0.1:8000/get_array/${numberOfPart}`
+        `http://127.0.0.1:5000/data/get_array/${numberOfPart}/${patient}`
       );
+
+      if (res.data && res.data.error) {
+        alert(res.data.error);
+        return;
+      }
 
       if (res.data) {
         const newLabels: string[] = [];
@@ -57,6 +66,8 @@ function App() {
 
           let isDataPresent = false;
 
+          console.log(res.data);
+
           for (const key in res.data) {
             isDataPresent = true;
             if (key.search("time") < 0) {
@@ -65,7 +76,9 @@ function App() {
               const ecg = res.data[key];
               const ecg_time = res.data[`${key}_time`];
 
-              setNumberOfPointsPerPage(res.data[key].length);
+              console.log(ecg, ecg_time);
+
+              // setNumberOfPointsPerPage(res.data[key].length);
 
               if (Object.hasOwn(tempData, key)) {
                 tempData[key] = [...tempData[key], ...ecg];
@@ -92,7 +105,7 @@ function App() {
                 });
               }
             } else {
-              setTimeLabel(key);
+              // setTimeLabel(key);
             }
           }
 
@@ -110,13 +123,13 @@ function App() {
     }
   };
 
-  useEffect(() => {
-    get_data();
-    const interval = setInterval(() => {
-      get_data();
-    }, 1000); // fetch every second
-    return () => clearInterval(interval);
-  }, []);
+  // useEffect(() => {
+  //   get_data();
+  //   const interval = setInterval(() => {
+  //     get_data();
+  //   }, 1000); // fetch every second
+  //   return () => clearInterval(interval);
+  // }, []);
 
   const get_canvases = () => {
     return points.map((row, idx) => (
@@ -164,6 +177,15 @@ function App() {
     graphDataRef.current = graphData;
   }, [graphData]);
 
+  const startGettingSignal = () => {
+    if (patient === "") return alert("Please enter patient name");
+
+    get_data();
+    interval = setInterval(() => {
+      get_data();
+    }, 1000); // fetch every second
+  };
+
   return (
     <div
       style={{
@@ -175,6 +197,17 @@ function App() {
       }}
     >
       <h1 style={{ marginBottom: "-20px" }}>Realtime ECG</h1>
+      <div>
+        <input
+          onChange={(e) => setPatient(e.target.value)}
+          type="text"
+          placeholder="Patient"
+          style={{ maxWidth: "400px", padding: "10px", margin: "5px auto" }}
+        />
+        <button onClick={startGettingSignal} style={{ marginLeft: "10px" }}>
+          Get Signal
+        </button>
+      </div>
       <div style={{ width: "90vw", display: "grid" }}>
         {/* <Line style={{ width: "100%" }} data={data} options={options} /> */}
         {/* <Graph data={tempData} /> */}
@@ -193,16 +226,18 @@ function App() {
         ) : (
           <button onClick={() => setIsAnalysis(!isAnalysis)}>Analyze</button>
         ))}
-      <div
-        style={{
-          width: "90vw",
-          height: "400px",
-          display: "grid",
-          justifyContent: "center",
-        }}
-      >
-        <BarChat />
-      </div>
+      {isAnalysis && (
+        <div
+          style={{
+            width: "90vw",
+            height: "400px",
+            display: "grid",
+            justifyContent: "center",
+          }}
+        >
+          <BarChat />
+        </div>
+      )}
     </div>
   );
 }
