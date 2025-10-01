@@ -1,58 +1,101 @@
 import { Bar } from "react-chartjs-2";
+import ChartDataLabels from "chartjs-plugin-datalabels";
+import { Chart as ChartJS } from "chart.js";
 
-const labels = ["January", "February", "March", "April", "May", "June", "July"];
+ChartJS.register(ChartDataLabels);
 
-const dataset = labels.map(() => Math.random() * 255);
+interface BarChartParms {
+  chartData: { [key: string]: number[] };
+  index: number;
+}
 
-// Find max value
-const maxValue = Math.max(...dataset);
+const BarChat = ({ chartData, index }: BarChartParms) => {
+  const labels = Object.keys(chartData).filter(
+    (k) => k !== "description" && k !== "sampling_rate"
+  );
+  const dataset = labels.map((label) => chartData[label][index]);
 
-const data = {
-  labels,
-  datasets: [
-    {
-      label: "",
-      data: dataset, // 0 to 1000
-      backgroundColor: "#242424",
-      borderWidth: 2,
-      borderColor: dataset.map((val) => (val === maxValue ? "red" : "cyan")),
-    },
-  ],
-};
+  const description = chartData["description"][index] ?? "None";
 
-const BarChat = () => {
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: {
-        display: false,
+  const maxValue = Math.max(...dataset);
+  const maxIndex = dataset.indexOf(maxValue);
+
+  const data = {
+    labels,
+    datasets: [
+      {
+        label: "",
+        data: dataset,
+        backgroundColor: dataset.map((val) =>
+          val === maxValue && val > 0.5 ? "red" : "cyan"
+        ),
+        borderWidth: 2,
+        borderColor: dataset.map((val) =>
+          val === maxValue && val > 0.5 ? "red" : "cyan"
+        ),
       },
-      title: {
-        display: true,
-        text: "Results after Analyzing data",
-      },
-    },
-    scales: {
-      x: {
-        ticks: {
-          color: "silver", // ✅ rgba(100, 100, 100, 0.7) x-axis labels
-        },
-        grid: {
-          color: "rgba(100, 100, 100, 0.7)", // ✅ rgba(100, 100, 100, 0.7) vertical grid lines
-        },
-      },
-      y: {
-        ticks: {
-          color: "silver", // ✅ rgba(100, 100, 100, 0.7) y-axis labels
-        },
-        grid: {
-          color: "rgba(100, 100, 100, 0.7)", // ✅ rgba(100, 100, 100, 0.7) horizontal grid lines
-        },
-      },
-    },
+    ],
   };
 
-  return <Bar options={options} data={data} />;
+  // const options = {
+  //   responsive: true,
+  //   plugins: {
+  //     legend: { display: false },
+  //     title: { display: true, text: "Results after Analyzing data" },
+  //     datalabels: {
+  //       display: (context: any) => context.dataIndex === maxIndex, // ❗only show on max bar
+  //       color: "white",
+  //       anchor: "end",
+  //       align: "top",
+  //       formatter: () => description, // ❗single description, not an array
+  //     },
+  //   },
+  //   scales: {
+  //     x: {
+  //       ticks: { color: "silver" },
+  //       grid: { color: "rgba(100, 100, 100, 0.7)" },
+  //     },
+  //     y: {
+  //       ticks: { color: "silver" },
+  //       grid: { color: "rgba(100, 100, 100, 0.7)" },
+  //     },
+  //   },
+  // };
+
+  return (
+    <Bar
+      options={{
+        responsive: true,
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: "Results after Analyzing data" },
+          datalabels: {
+            display:
+              maxValue > 0.5
+                ? (context: any) => context.dataIndex === maxIndex
+                : false, // ❗only show on max bar
+            color: "white",
+            anchor: "end",
+            align: "top",
+            formatter: () => description, // ❗single description, not an array
+          },
+        },
+        scales: {
+          x: {
+            ticks: { color: "silver" },
+            grid: { color: "rgba(100, 100, 100, 0.7)" },
+          },
+          y: {
+            min: 0,
+            max: 1,
+            ticks: { color: "silver" },
+            grid: { color: "rgba(100, 100, 100, 0.7)" },
+          },
+        },
+      }}
+      data={data}
+    />
+  );
 };
 
 export default BarChat;

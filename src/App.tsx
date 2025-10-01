@@ -13,10 +13,12 @@ import {
   Legend,
 } from "chart.js";
 import zoomPlugin from "chartjs-plugin-zoom";
+import ChartDataLabels from "chartjs-plugin-datalabels";
 import "./App.css";
 import Graph from "./graph";
 import BeatButton from "./beatButton";
 import BarChat from "./barchat";
+import WaitingForSignal from "./WaitingForSignal";
 
 ChartJS.register(
   CategoryScale,
@@ -27,21 +29,25 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  zoomPlugin
+  zoomPlugin,
+  ChartDataLabels
 );
 
 function App() {
-  let interval;
+  // let interval;
   let numberOfPart = -1;
   let indexForPoint = 0;
+  let sampling_rate = 10;
 
-  const [patient, setPatient] = useState("");
+  // const [patient, setPatient] = useState("");
 
   const [graphLabels, setGraphLabels] = useState<string[]>([]);
   // const [timeLabel, setTimeLabel] = useState<string>("");
   const [graphData, setGraphData] = useState<any>({});
   // const [numberOfPointPerPage, setNumberOfPointsPerPage] = useState<number>(0);
   const [points, setPoints] = useState<number[][]>([]);
+  const [barChartData, setBarChartData] = useState({});
+
   const graphDataRef = useRef(graphData);
   const indexRef = useRef(0);
 
@@ -50,33 +56,37 @@ function App() {
   const get_data = async () => {
     try {
       const res = await axios.get(
-        `http://127.0.0.1:5000/data/get_array/${numberOfPart}/${patient}`
+        `http://127.0.0.1:5001/data/get_array/${numberOfPart}`
       );
 
       if (res.data && res.data.error) {
-        alert(res.data.error);
+        console.log(res.data.error);
         return;
       }
 
       if (res.data) {
+        console.log(res.data);
         const newLabels: string[] = [];
 
         setGraphData((prevData: any) => {
           const tempData = { ...prevData };
 
           let isDataPresent = false;
+          let length = 0;
 
-          console.log(res.data);
+          for (const key in res.data) {
+            if (key.search("time") >= 0 || key.search("lsi_") >= 0) continue;
+
+            length = res.data[key].length;
+          }
 
           for (const key in res.data) {
             isDataPresent = true;
-            if (key.search("time") < 0) {
+            if (key.search("time") < 0 && key.search("lsi_") < 0) {
               newLabels.push(key);
 
               const ecg = res.data[key];
               const ecg_time = res.data[`${key}_time`];
-
-              console.log(ecg, ecg_time);
 
               // setNumberOfPointsPerPage(res.data[key].length);
 
@@ -96,6 +106,7 @@ function App() {
                   }),
                 ];
               } else {
+                console.log(ecg, ecg_time);
                 tempData[key] = ecg;
                 // tempData[`${key}_time`] = ecg_time;
                 let i = 0;
@@ -105,31 +116,58 @@ function App() {
                 });
               }
             } else {
-              // setTimeLabel(key);
+              const values: number[] = [];
+
+              let valueToadd = 0.1;
+
+              if (key === "lsi_description") {
+                valueToadd = res.data[key];
+              } else {
+                if (res.data[key]) {
+                  valueToadd = Math.random() * (0.95 - 0.5) + 0.5; // Range: 0.5 to 0.95
+                } else {
+                  valueToadd = Math.random() * (0.1 - 0.02) + 0.02; // 0.02 → 0.15
+                }
+              }
+
+              if (key === "lsi_sampling_rate") {
+                console.log("lsi_sampling_rate", key, res.data[key]);
+                sampling_rate = 1000 / res.data[key];
+              }
+
+              for (let i = 0; i < length; i++) {
+                values.push(valueToadd);
+              }
+
+              if (Object.hasOwn(tempData, key)) {
+                tempData[key] = [...values, ...tempData[key]];
+              } else {
+                tempData[key] = values;
+              }
             }
           }
 
           if (isDataPresent) {
             numberOfPart++;
           }
-
+          // console.log(tempData);
           return tempData; // new reference each time
         });
 
         setGraphLabels(newLabels);
       }
     } catch (err) {
-      console.log(err);
+      // console.log(err);
     }
   };
 
-  // useEffect(() => {
-  //   get_data();
-  //   const interval = setInterval(() => {
-  //     get_data();
-  //   }, 1000); // fetch every second
-  //   return () => clearInterval(interval);
-  // }, []);
+  useEffect(() => {
+    get_data();
+    const interval = setInterval(() => {
+      get_data();
+    }, 1000); // fetch every second
+    return () => clearInterval(interval);
+  }, []);
 
   const get_canvases = () => {
     return points.map((row, idx) => (
@@ -145,7 +183,7 @@ function App() {
       let i = 0;
 
       for (const key in latestData) {
-        if (key.includes("time")) continue;
+        if (key.includes("time") || key.includes("lsi_")) continue;
 
         if (latestData[key].length > 0) {
           if (indexRef.current > latestData[key].length) {
@@ -167,7 +205,7 @@ function App() {
       indexRef.current += 1;
 
       setPoints(newPoints);
-    }, 10);
+    }, sampling_rate);
 
     return () => clearInterval(interval);
   }, [points, indexForPoint]);
@@ -175,16 +213,30 @@ function App() {
   // keep ref updated
   useEffect(() => {
     graphDataRef.current = graphData;
+
+    const tempBarChartData: { [key: string]: boolean } = {};
+    for (const key in graphData) {
+      if (key.includes("lsi_")) {
+        const filteredKey = key.replace("lsi_", "");
+        const element = graphData[key];
+
+        tempBarChartData[filteredKey] = element;
+      }
+    }
+
+    console.log(tempBarChartData);
+
+    setBarChartData(tempBarChartData);
   }, [graphData]);
 
-  const startGettingSignal = () => {
-    if (patient === "") return alert("Please enter patient name");
+  // const startGettingSignal = () => {
+  //   if (patient === "") return alert("Please enter patient name");
 
-    get_data();
-    interval = setInterval(() => {
-      get_data();
-    }, 1000); // fetch every second
-  };
+  //   get_data();
+  //   interval = setInterval(() => {
+  //     get_data();
+  //   }, 1000); // fetch every second
+  // };
 
   return (
     <div
@@ -196,8 +248,10 @@ function App() {
         width: "95vw",
       }}
     >
-      <h1 style={{ marginBottom: "-20px" }}>Realtime ECG</h1>
-      <div>
+      {points && points.length <= 0 && (
+        <h1 style={{ marginBottom: "-20px" }}>Realtime ECG</h1>
+      )}
+      {/* <div>
         <input
           onChange={(e) => setPatient(e.target.value)}
           type="text"
@@ -207,8 +261,16 @@ function App() {
         <button onClick={startGettingSignal} style={{ marginLeft: "10px" }}>
           Get Signal
         </button>
-      </div>
-      <div style={{ width: "90vw", display: "grid" }}>
+      </div> */}
+      {points && points.length <= 0 && <WaitingForSignal />}
+
+      <div
+        style={{
+          width: "50vw",
+          display: "grid",
+          margin: "0px auto",
+        }}
+      >
         {/* <Line style={{ width: "100%" }} data={data} options={options} /> */}
         {/* <Graph data={tempData} /> */}
         {get_canvases()}
@@ -229,13 +291,13 @@ function App() {
       {isAnalysis && (
         <div
           style={{
-            width: "90vw",
-            height: "400px",
+            height: "350px",
             display: "grid",
             justifyContent: "center",
+            marginLeft: "-5vw",
           }}
         >
-          <BarChat />
+          <BarChat chartData={barChartData} index={indexRef.current} />
         </div>
       )}
     </div>

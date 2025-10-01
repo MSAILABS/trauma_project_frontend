@@ -6,7 +6,7 @@ interface GraphParams {
 }
 
 const Graph = ({ title, data }: GraphParams) => {
-  const height = 250;
+  const height = 100;
   const gridRef = useRef<HTMLCanvasElement | null>(null);
   const graphRef = useRef<HTMLCanvasElement | null>(null);
 
