@@ -1,234 +1,258 @@
-import { useEffect, useRef, useState } from 'react'
-import axios from 'axios'
+import { useEffect, useRef, useState } from "react";
+import axios from "axios";
 // import { Line } from "react-chartjs-2";
-import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend } from 'chart.js'
-import zoomPlugin from 'chartjs-plugin-zoom'
-import ChartDataLabels from 'chartjs-plugin-datalabels'
-import './App.css'
-import Graph from './graph'
-import BeatButton from './beatButton'
-import BarChat from './barchat'
-import WaitingForSignal from './WaitingForSignal'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from "chart.js";
+import zoomPlugin from "chartjs-plugin-zoom";
+import ChartDataLabels from "chartjs-plugin-datalabels";
+import "./App.css";
+import Graph from "./graph";
+import BeatButton from "./beatButton";
+import BarChat from "./barchat";
+import WaitingForSignal from "./WaitingForSignal";
 
-ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Title, Tooltip, Legend, zoomPlugin, ChartDataLabels)
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  zoomPlugin,
+  ChartDataLabels
+);
 
 function App() {
-	// let interval;
-	let numberOfPart = -1
-	let indexForPoint = 0
-	let sampling_rate = 10
+  // let interval;
+  let numberOfPart = -1;
+  let indexForPoint = 0;
+  let sampling_rate = 10;
 
-	// const [patient, setPatient] = useState("");
+  // const [patient, setPatient] = useState("");
 
-	const [graphLabels, setGraphLabels] = useState<string[]>([])
-	// const [timeLabel, setTimeLabel] = useState<string>("");
-	const [graphData, setGraphData] = useState<any>({})
-	// const [numberOfPointPerPage, setNumberOfPointsPerPage] = useState<number>(0);
-	const [points, setPoints] = useState<number[][]>([])
-	const [barChartData, setBarChartData] = useState({})
+  const [graphLabels, setGraphLabels] = useState<string[]>([]);
+  // const [timeLabel, setTimeLabel] = useState<string>("");
+  const [graphData, setGraphData] = useState<any>({});
+  // const [numberOfPointPerPage, setNumberOfPointsPerPage] = useState<number>(0);
+  const [points, setPoints] = useState<number[][]>([]);
+  const [barChartData, setBarChartData] = useState({});
 
-	const graphDataRef = useRef(graphData)
-	const indexRef = useRef(0)
+  const graphDataRef = useRef(graphData);
+  const indexRef = useRef(0);
 
-	const [isAnalysis, setIsAnalysis] = useState(false)
+  const [isAnalysis, setIsAnalysis] = useState(false);
 
-	const get_data = async () => {
-		try {
-			const res = await axios.get(`http://127.0.0.1:5001/data/get_array/${numberOfPart}`)
+  const get_data = async () => {
+    try {
+      const res = await axios.get(
+        `http://127.0.0.1:5001/data/get_array/${numberOfPart}`
+      );
 
-			if (res.data && res.data.error) {
-				console.log(res.data.error)
-				return
-			}
+      if (res.data && res.data.error) {
+        console.log(res.data.error);
+        return;
+      }
 
-			if (res.data) {
-				console.log(res.data)
-				const newLabels: string[] = []
+      if (res.data) {
+        console.log(res.data);
+        const newLabels: string[] = [];
 
-				setGraphData((prevData: any) => {
-					const tempData = { ...prevData }
+        numberOfPart++;
 
-					let isDataPresent = false
-					let length = 0
+        setGraphData((prevData: any) => {
+          const tempData = { ...prevData };
 
-					for (const key in res.data) {
-						if (key.search('time') >= 0 || key.search('lsi_') >= 0) continue
+          // let isDataPresent = false;
+          let length = 0;
 
-						length = res.data[key].length
-					}
+          for (const key in res.data) {
+            if (key.search("time") >= 0 || key.search("lsi_") >= 0) continue;
 
-					for (const key in res.data) {
-						isDataPresent = true
-						if (key.search('time') < 0 && key.search('lsi_') < 0) {
-							newLabels.push(key)
+            length = res.data[key].length;
+          }
 
-							const ecg = res.data[key]
-							const ecg_time = res.data[`${key}_time`]
+          for (const key in res.data) {
+            // isDataPresent = true;
+            if (key.search("time") < 0 && key.search("lsi_") < 0) {
+              newLabels.push(key);
 
-							// setNumberOfPointsPerPage(res.data[key].length);
+              const ecg = res.data[key];
+              const ecg_time = res.data[`${key}_time`];
 
-							if (Object.hasOwn(tempData, key)) {
-								tempData[key] = [...tempData[key], ...ecg]
-								// tempData[`${key}_time`] = [
-								//   ...tempData[`${key}_time`],
-								//   ...ecg_time,
-								// ];
+              // setNumberOfPointsPerPage(res.data[key].length);
 
-								let i = tempData[`${key}_time`].length
-								tempData[`${key}_time`] = [
-									...tempData[`${key}_time`],
-									...ecg_time.map(() => {
-										i += 1
-										return i
-									}),
-								]
-							} else {
-								// console.log(ecg, ecg_time);
-								tempData[key] = ecg
-								// tempData[`${key}_time`] = ecg_time;
-								let i = 0
-								tempData[`${key}_time`] = ecg_time.map(() => {
-									i += 1
-									return i
-								})
-							}
-						} else {
-							const values: number[] = []
+              if (Object.hasOwn(tempData, key)) {
+                tempData[key] = [...tempData[key], ...ecg];
+                // tempData[`${key}_time`] = [
+                //   ...tempData[`${key}_time`],
+                //   ...ecg_time,
+                // ];
 
-							let valueToadd = 0.1
+                let i = tempData[`${key}_time`].length;
+                tempData[`${key}_time`] = [
+                  ...tempData[`${key}_time`],
+                  ...ecg_time.map(() => {
+                    i += 1;
+                    return i;
+                  }),
+                ];
+              } else {
+                // console.log(ecg, ecg_time);
+                tempData[key] = ecg;
+                // tempData[`${key}_time`] = ecg_time;
+                let i = 0;
+                tempData[`${key}_time`] = ecg_time.map(() => {
+                  i += 1;
+                  return i;
+                });
+              }
+            } else {
+              const values: number[] = [];
 
-							if (key === 'lsi_description') {
-								valueToadd = res.data[key]
-							} else {
-								if (res.data[key]) {
-									valueToadd = Math.random() * (0.95 - 0.5) + 0.5 // Range: 0.5 to 0.95
-								} else {
-									valueToadd = Math.random() * (0.1 - 0.02) + 0.02 // 0.02 → 0.15
-								}
-							}
+              let valueToadd = 0.1;
 
-							if (key === 'lsi_sampling_rate') {
-								sampling_rate = 1000 / res.data[key]
-							}
+              if (key === "lsi_description") {
+                valueToadd = res.data[key];
+              } else {
+                if (res.data[key]) {
+                  valueToadd = Math.random() * (0.95 - 0.5) + 0.5; // Range: 0.5 to 0.95
+                } else {
+                  valueToadd = Math.random() * (0.1 - 0.02) + 0.02; // 0.02 → 0.15
+                }
+              }
 
-							for (let i = 0; i < length; i++) {
-								values.push(valueToadd)
-							}
+              if (key === "lsi_sampling_rate") {
+                sampling_rate = 1000 / res.data[key];
+              }
 
-							if (Object.hasOwn(tempData, key)) {
-								tempData[key] = [...values, ...tempData[key]]
-							} else {
-								tempData[key] = values
-							}
-						}
-					}
+              for (let i = 0; i < length; i++) {
+                values.push(valueToadd);
+              }
 
-					if (isDataPresent) {
-						numberOfPart++
-					}
-					// console.log(tempData);
-					return tempData // new reference each time
-				})
+              if (Object.hasOwn(tempData, key)) {
+                tempData[key] = [...values, ...tempData[key]];
+              } else {
+                tempData[key] = values;
+              }
+            }
+          }
 
-				setGraphLabels(newLabels)
-			}
-		} catch (err) {
-			// console.log(err);
-		}
-	}
+          // if (isDataPresent) {
+          //   numberOfPart++;
+          // }
+          // console.log(tempData);
+          return tempData; // new reference each time
+        });
 
-	useEffect(() => {
-		get_data()
-		const interval = setInterval(() => {
-			get_data()
-		}, 1000) // fetch every second
-		return () => clearInterval(interval)
-	}, [])
+        setGraphLabels(newLabels);
+      }
+    } catch (err) {
+      // console.log(err);
+    }
+  };
 
-	const get_canvases = () => {
-		return points.map((row, idx) => (
-			<Graph
-				key={idx}
-				title={graphLabels[idx]}
-				data={row}
-			/>
-		))
-	}
+  useEffect(() => {
+    get_data();
+    const interval = setInterval(() => {
+      get_data();
+    }, 1000); // fetch every second
+    return () => clearInterval(interval);
+  }, []);
 
-	useEffect(() => {
-		const interval = setInterval(() => {
-			const latestData = graphDataRef.current // ✅ always latest
+  const get_canvases = () => {
+    return points.map((row, idx) => (
+      <Graph key={idx} title={graphLabels[idx]} data={row} />
+    ));
+  };
 
-			const newPoints: number[][] = []
-			let i = 0
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const latestData = graphDataRef.current; // ✅ always latest
 
-			for (const key in latestData) {
-				if (key.includes('time') || key.includes('lsi_')) continue
+      const newPoints: number[][] = [];
+      let i = 0;
 
-				if (latestData[key].length > 0) {
-					if (indexRef.current > latestData[key].length) {
-						return
-					}
-				}
+      for (const key in latestData) {
+        if (key.includes("time") || key.includes("lsi_")) continue;
 
-				const element = -latestData[key][indexRef.current]
+        if (latestData[key].length > 0) {
+          if (indexRef.current > latestData[key].length) {
+            return;
+          }
+        }
 
-				if (points.length > 0) {
-					newPoints.push([element, ...points[i]])
-				} else {
-					newPoints.push([element])
-				}
+        const element = -latestData[key][indexRef.current];
 
-				i++
-			}
+        if (points.length > 0) {
+          newPoints.push([element, ...points[i]]);
+        } else {
+          newPoints.push([element]);
+        }
 
-			indexRef.current += 1
+        i++;
+      }
 
-			setPoints(newPoints)
-		}, sampling_rate)
+      indexRef.current += 1;
 
-		return () => clearInterval(interval)
-	}, [points, indexForPoint])
+      setPoints(newPoints);
+    }, sampling_rate);
 
-	// keep ref updated
-	useEffect(() => {
-		graphDataRef.current = graphData
+    return () => clearInterval(interval);
+  }, [points, indexForPoint]);
 
-		const tempBarChartData: { [key: string]: boolean } = {}
-		for (const key in graphData) {
-			if (key.includes('lsi_')) {
-				const filteredKey = key.replace('lsi_', '')
-				const element = graphData[key]
+  // keep ref updated
+  useEffect(() => {
+    graphDataRef.current = graphData;
 
-				tempBarChartData[filteredKey] = element
-			}
-		}
+    const tempBarChartData: { [key: string]: boolean } = {};
+    for (const key in graphData) {
+      if (key.includes("lsi_")) {
+        const filteredKey = key.replace("lsi_", "");
+        const element = graphData[key];
 
-		console.log(tempBarChartData)
+        tempBarChartData[filteredKey] = element;
+      }
+    }
 
-		setBarChartData(tempBarChartData)
-	}, [graphData])
+    console.log(tempBarChartData);
 
-	// const startGettingSignal = () => {
-	//   if (patient === "") return alert("Please enter patient name");
+    setBarChartData(tempBarChartData);
+  }, [graphData]);
 
-	//   get_data();
-	//   interval = setInterval(() => {
-	//     get_data();
-	//   }, 1000); // fetch every second
-	// };
+  // const startGettingSignal = () => {
+  //   if (patient === "") return alert("Please enter patient name");
 
-	return (
-		<div
-			style={{
-				display: 'grid',
-				justifyContent: 'center',
-				gap: '50px',
-				margin: '0px auto',
-				width: '95vw',
-			}}>
-			{points && points.length <= 0 && <h1 style={{ marginBottom: '-20px' }}>Realtime ECG</h1>}
-			{/* <div>
+  //   get_data();
+  //   interval = setInterval(() => {
+  //     get_data();
+  //   }, 1000); // fetch every second
+  // };
+
+  return (
+    <div
+      style={{
+        display: "grid",
+        justifyContent: "center",
+        gap: "50px",
+        margin: "0px auto",
+        width: "95vw",
+      }}
+    >
+      {points && points.length <= 0 && (
+        <h1 style={{ marginBottom: "-20px" }}>Realtime ECG</h1>
+      )}
+      {/* <div>
         <input
           onChange={(e) => setPatient(e.target.value)}
           type="text"
@@ -239,47 +263,46 @@ function App() {
           Get Signal
         </button>
       </div> */}
-			{points && points.length <= 0 && <WaitingForSignal />}
+      {points && points.length <= 0 && <WaitingForSignal />}
 
-			<div
-				style={{
-					width: '50vw',
-					display: 'grid',
-					margin: '0px auto',
-				}}>
-				{/* <Line style={{ width: "100%" }} data={data} options={options} /> */}
-				{/* <Graph data={tempData} /> */}
-				{get_canvases()}
-			</div>
-			{points.length > 0 &&
-				(isAnalysis ? (
-					<BeatButton
-						width={300}
-						color1='rgba(0, 187, 187, 1)'
-						color2='rgba(0, 139, 106, 1)'
-						beats={100}
-						label='Analysing Data'
-						speed={300}
-					/>
-				) : (
-					<button onClick={() => setIsAnalysis(!isAnalysis)}>Analyze</button>
-				))}
-			{isAnalysis && (
-				<div
-					style={{
-						height: '350px',
-						display: 'grid',
-						justifyContent: 'center',
-						marginLeft: '-5vw',
-					}}>
-					<BarChat
-						chartData={barChartData}
-						index={indexRef.current}
-					/>
-				</div>
-			)}
-		</div>
-	)
+      <div
+        style={{
+          width: "50vw",
+          display: "grid",
+          margin: "0px auto",
+        }}
+      >
+        {/* <Line style={{ width: "100%" }} data={data} options={options} /> */}
+        {/* <Graph data={tempData} /> */}
+        {get_canvases()}
+      </div>
+      {points.length > 0 &&
+        (isAnalysis ? (
+          <BeatButton
+            width={300}
+            color1="rgba(0, 187, 187, 1)"
+            color2="rgba(0, 139, 106, 1)"
+            beats={100}
+            label="Analysing Data"
+            speed={300}
+          />
+        ) : (
+          <button onClick={() => setIsAnalysis(!isAnalysis)}>Analyze</button>
+        ))}
+      {isAnalysis && (
+        <div
+          style={{
+            height: "350px",
+            display: "grid",
+            justifyContent: "center",
+            marginLeft: "-5vw",
+          }}
+        >
+          <BarChat chartData={barChartData} index={indexRef.current} />
+        </div>
+      )}
+    </div>
+  );
 }
 
-export default App
+export default App;
