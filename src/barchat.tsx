@@ -1,5 +1,5 @@
 import { Bar } from "react-chartjs-2";
-import ChartDataLabels from "chartjs-plugin-datalabels";
+import ChartDataLabels, { type Context } from "chartjs-plugin-datalabels";
 import { Chart as ChartJS } from "chart.js";
 
 ChartJS.register(ChartDataLabels);
@@ -62,6 +62,17 @@ const BarChat = ({ chartData, index }: BarChartParms) => {
   //   },
   // };
 
+  const des: {[key: string]: string[]} = {
+    "Airway & Respiration": [
+      "Endotracheal Intubation/Intubation",
+      "Mechanical Ventilation",
+      "RSI meds",
+      "intubation",
+    ],
+    "Bleeding Control": ["Pelvic Binder"],
+    "Blood Products": ["0 < FF < 3", "0 < RBC < 3", "RBC >= 3"],
+  };
+
   return (
     <Bar
       options={{
@@ -72,12 +83,23 @@ const BarChat = ({ chartData, index }: BarChartParms) => {
           datalabels: {
             display:
               maxValue > 0.5
-                ? (context: any) => context.dataIndex === maxIndex
-                : false, // ❗only show on max bar
+                ? (context: Context) => {
+                    let l = false;
+
+                    for (const key in des) {
+                      if (key === labels[maxIndex])
+                        if (des[key].includes(`${description}`)) {
+                          l = true;
+                        }
+                    }
+
+                    return l && context.dataIndex === maxIndex;
+                  }
+                : false,
             color: "white",
             anchor: "end",
             align: "top",
-            formatter: () => description, // ❗single description, not an array
+            formatter: () => `${description}` === "None" ? "" : description,
           },
         },
         scales: {

@@ -39,8 +39,9 @@ function App() {
   let indexForPoint = 0;
   let sampling_rate = 10;
 
-  // const [patient, setPatient] = useState("");
+  const random_lsi_values: {[key: string]: any} = {"false": {}, "true": {}}
 
+  // const [patient, setPatient] = useState("");
   const [graphLabels, setGraphLabels] = useState<string[]>([]);
   // const [timeLabel, setTimeLabel] = useState<string>("");
   const [graphData, setGraphData] = useState<any>({});
@@ -60,18 +61,19 @@ function App() {
       );
 
       if (res.data && res.data.error) {
-        console.log(res.data.error);
+        // console.log(res.data.error);
         return;
       }
 
       if (res.data) {
-        console.log(res.data);
+        // console.log(res.data);
         const newLabels: string[] = [];
 
         numberOfPart++;
 
         setGraphData((prevData: any) => {
           const tempData = { ...prevData };
+          // const tempData = {}
 
           // let isDataPresent = false;
           let length = 0;
@@ -126,9 +128,29 @@ function App() {
                 valueToadd = res.data[key];
               } else {
                 if (res.data[key]) {
-                  valueToadd = Math.random() * (0.95 - 0.5) + 0.5; // Range: 0.5 to 0.95
+                  if (Object.hasOwn(random_lsi_values.true, key)) {
+                    valueToadd = random_lsi_values.true[key]
+                  } else {
+                    console.log(res.data["lsi_description"], res.data["lsi_description"] === "Pelvic Binder", "lsi_description")
+                    if (res.data["lsi_description"] === "Pelvic Binder") {
+                      if (key === "lsi_Bleeding Control") {
+                        valueToadd = Math.random() * (0.95 - 0.8) + 0.8; // Range: 0.5 to 0.95
+                      } else {
+                        valueToadd = Math.random() * (0.70 - 0.5) + 0.5; // Range: 0.5 to 0.95
+                      }
+                    } else {
+                      valueToadd = Math.random() * (0.95 - 0.5) + 0.5; // Range: 0.5 to 0.95
+                    }
+
+                    random_lsi_values.true[key] = valueToadd
+                  }
                 } else {
-                  valueToadd = Math.random() * (0.1 - 0.02) + 0.02; // 0.02 → 0.15
+                  if (Object.hasOwn(random_lsi_values.false, key)) {
+                    valueToadd = random_lsi_values.false[key]
+                  } else {
+                    valueToadd = Math.random() * (0.1 - 0.02) + 0.02; // 0.02 → 0.15
+                    random_lsi_values.false[key] = valueToadd
+                  }
                 }
               }
 
@@ -151,7 +173,26 @@ function App() {
           // if (isDataPresent) {
           //   numberOfPart++;
           // }
-          // console.log(tempData);
+          // 🚀 Trim long arrays to max 10000 items
+          // 🚀 Trim long arrays to max 10000 items (keep the FIRST 10000, delete the rest)
+          // for (const key in tempData) {
+          //   if (Array.isArray(tempData[key]) && tempData[key].length > 100000) {
+          //     tempData[key] = tempData[key].slice(0, 100000); // ✅ Keep first 10000
+          //   }
+          // }
+          // if (tempData[Object.keys(tempData)[0]].length > 10000) {
+          //   const samllData = {}
+
+          //   for (const key in tempData) {
+          //     if (!Object.hasOwn(tempData, key)) continue;
+              
+          //     const element = tempData[key];
+              
+          //     samllData[key] = element.slice(-10000)
+          //   }
+
+          //   return samllData
+          // }
           return tempData; // new reference each time
         });
 
@@ -206,6 +247,7 @@ function App() {
       indexRef.current += 1;
 
       setPoints(newPoints);
+
     }, sampling_rate);
 
     return () => clearInterval(interval);
@@ -225,7 +267,7 @@ function App() {
       }
     }
 
-    console.log(tempBarChartData);
+    // console.log(tempBarChartData);
 
     setBarChartData(tempBarChartData);
   }, [graphData]);
