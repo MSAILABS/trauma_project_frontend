@@ -1,13 +1,13 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from './Index.tsx'
 import NewApp from "./NewApp";
 import LoginPage from "./LoginPage";
+import FirstPage from "./FirstPage";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Index />} />
+        <Route path="/" element={<FirstPage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/run_demo" element={<NewApp />} />
       </Routes>

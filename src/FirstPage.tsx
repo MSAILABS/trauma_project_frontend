@@ -1,6 +1,4 @@
-import demoVideo from "./assets/graph_6_edited.mov";
-
-const Index = () => {
+const FirstPage = () => {
   return (
     <main
       style={{
@@ -25,7 +23,7 @@ const Index = () => {
       </h1>
 
       <video
-        src={demoVideo}
+        src={'graph_6_edited.mov'}
         style={{
           width: "80%",
           maxWidth: "70vw",
@@ -54,7 +52,7 @@ const Index = () => {
 
       <p>Email: marvasti.marvsai@gmail.com</p>
     </main>
-  );
-};
+  )
+}
 
-export default Index;
+export default FirstPage
