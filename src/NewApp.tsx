@@ -1,7 +1,9 @@
 import axios from "axios";
 import { useEffect, useState } from "react";
-import MultiSignalCharts from "./barChatNew";
-import MultiSignalGraph from "./graphNew";
+import { useNavigate } from "react-router-dom";
+import MultiSignalCharts from "./Components/barChatNew";
+import MultiSignalGraph from "./Components/graphNew";
+import WaitingForData from "./Components/waiting";
 
 // Define types
 interface Signals {
@@ -20,15 +22,15 @@ interface DataState {
 const MAX_POINTS = 1000; // keep last N points per signal
 
 const NewApp = () => {
+  const navigate = useNavigate();
   const [dataState, setDataState] = useState<DataState>({
     signals: {},
     meta: {},
   });
 
   const getData = async () => {
-    console.log("get Data");
     try {
-      const res = await axios.get("http://127.0.0.1:5001/data/get_array");
+      const res = await axios.get("http://localhost:5001/data/get_array");
       const newSignals: Signals = res.data.data.signals || {};
       const newMetaRaw: { [key: string]: any } = res.data.data.meta || {};
 
@@ -83,8 +85,13 @@ const NewApp = () => {
           meta: updatedMeta,
         };
       });
-    } catch (err) {
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+      alert("Please login to continue.");
+      navigate("/login");
+    } else {
       console.error(err);
+    }
     }
   };
 
@@ -95,13 +102,23 @@ const NewApp = () => {
     return () => clearInterval(interval);
   }, []);
 
+  const hasData =
+    Object.keys(dataState.signals).length > 0 &&
+    Object.values(dataState.signals)[0].length > 0;
+
   return (
     <div style={{ textAlign: "center" }}>
       <h1>ECG Signals & Meta</h1>
       {/* <pre>{JSON.stringify(dataState, null, 2)}</pre> */}
       {/* Render all signal graphs */}
-      <MultiSignalGraph signals={dataState.signals} />
-      <MultiSignalCharts chartData={dataState} />
+      {!hasData ? (
+        <WaitingForData />
+      ) : (
+        <>
+          <MultiSignalGraph signals={dataState.signals} />
+          <MultiSignalCharts chartData={dataState} />
+        </>
+      )}
     </div>
   );
 };

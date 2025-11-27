@@ -15,10 +15,10 @@ import {
 import zoomPlugin from "chartjs-plugin-zoom";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import "./App.css";
-import Graph from "./graph";
-import BeatButton from "./beatButton";
-import BarChat from "./barchat";
-import WaitingForSignal from "./WaitingForSignal";
+import Graph from "./Components/graph";
+import BeatButton from "./Components/beatButton";
+import BarChat from "./Components/barchat";
+import WaitingForSignal from "./Components/WaitingForSignal";
 
 ChartJS.register(
   CategoryScale,
