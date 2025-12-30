@@ -67,37 +67,76 @@ const SignalGraph = ({ signalKey, signals, maxPoints }: GraphProps) => {
   // How fast to "consume" data from the queue. 16ms = ~60fps
   const animationInterval = 16; 
 
-  // Draw static grid once (No changes)
   useEffect(() => {
     const canvas = gridRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
-    // ... (rest of grid drawing logic is identical) ...
+
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
-    ctx.scale(dpr, dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const { width, height } = rect;
-    ctx.clearRect(0, 0, width, height);
-    ctx.strokeStyle = "rgba(200,200,200,0.2)";
-    const gridSize = 20;
 
-    for (let x = 0; x <= width; x += gridSize) {
-      ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-      ctx.stroke();
-    }
-    for (let y = 0; y <= height; y += gridSize) {
+    ctx.clearRect(0, 0, width, height);
+
+    // -------------------------
+    // ECG-style grid settings
+    // -------------------------
+    const minorDivisions = 5;
+    const majorDivisions = 25;
+
+    const minorGrid = height / minorDivisions;
+    const majorGrid = height / majorDivisions;
+
+    // Minor grid
+    ctx.strokeStyle = "rgba(255,255,255,0.05)";
+    ctx.lineWidth = 1;
+
+    for (let y = 0; y <= height; y += minorGrid) {
       ctx.beginPath();
       ctx.moveTo(0, y);
       ctx.lineTo(width, y);
       ctx.stroke();
     }
+
+    for (let x = 0; x <= width; x += minorGrid) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+
+    // Major grid
+    ctx.strokeStyle = "rgba(255,255,255,0.12)";
+    ctx.lineWidth = 1.5;
+
+    for (let y = 0; y <= height; y += majorGrid) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(width, y);
+      ctx.stroke();
+    }
+
+    for (let x = 0; x <= width; x += majorGrid) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, height);
+      ctx.stroke();
+    }
+
+    // Center line (important for ECG)
+    // ctx.strokeStyle = "rgba(255,255,255,0.25)";
+    // ctx.lineWidth = 2;
+    // ctx.beginPath();
+    // ctx.moveTo(0, height / 2);
+    // ctx.lineTo(width, height / 2);
+    // ctx.stroke();
   }, []);
+
 
   // STEP 1: Add new data to the queue when props change
   useEffect(() => {
@@ -148,6 +187,7 @@ const SignalGraph = ({ signalKey, signals, maxPoints }: GraphProps) => {
             renderBufferRef.current.shift();
           }
         }
+
         
         // --- Start Drawing ---
         ctx.clearRect(0, 0, width, height);
@@ -161,34 +201,65 @@ const SignalGraph = ({ signalKey, signals, maxPoints }: GraphProps) => {
         ctx.stroke();
 
         const data = renderBufferRef.current;
+        if (data.length < 2) return;
+
+        // 🔴 NEW: dynamic scaling
+        let minVal = Infinity;
+        let maxVal = -Infinity;
+
+        for (const v of data) {
+          if (v < minVal) minVal = v;
+          if (v > maxVal) maxVal = v;
+        }
+        
         if (data.length < 2) return; // Not enough data to draw
 
+        
+        
         // --- Draw the line ---
         const xStep = width / (maxPoints - 1);
-
+        
         // Pad the start if buffer isn't full
         const pointsToPad = maxPoints - data.length;
         const startX = pointsToPad * xStep;
+
+        // Signal center and amplitude
+        const midValue = (maxVal + minVal) / 2;
+        const amplitude = Math.max(Math.abs(maxVal - midValue), Math.abs(minVal - midValue));
+
+        // Prevent over-zooming on flat signals
+        const safeAmplitude = amplitude < 0.025 ? 0.025 : amplitude;
+
+        const gain = 2; // 🔼 increase bumps (try 1.5 – 3.0)
+        const scaleY = (height * 0.45 * gain) / safeAmplitude;
+
+
+        const normalizeY = (v: number) => {
+          return midY - (v - midValue) * scaleY;
+        };
+
 
         ctx.beginPath();
         ctx.strokeStyle = "cyan";
         ctx.lineWidth = 2;
 
         let prevX = startX;
-        let prevY = midY - data[0] * (height / 2);
+        let prevY = normalizeY(data[0]);
         ctx.moveTo(prevX, prevY);
 
         for (let i = 1; i < data.length; i++) {
           const currX = startX + i * xStep;
-          const currY = midY - data[i] * (height / 2);
+          const currY = normalizeY(data[i]);
 
           const midX = (prevX + currX) / 2;
-          const midYPoint = (prevY + currY) / 2;
+          const midYPoint = (prevY + currY ) / 2;
+
           ctx.quadraticCurveTo(prevX, prevY, midX, midYPoint);
 
           prevX = currX;
           prevY = currY;
         }
+
         
         ctx.lineTo(prevX, prevY);
         ctx.stroke();
@@ -235,7 +306,7 @@ const SignalGraph = ({ signalKey, signals, maxPoints }: GraphProps) => {
         {yTicks.map((val) => <div key={val}>{val}</div>)}
       </div>
       <canvas ref={gridRef} style={{ width: "100%", height: `${height}px`, position: "absolute", top: 0, left: 0, zIndex: 1 }} />
-      <canvas ref={graphRef} style={{ width: "100%", height: `${height}px`, position: "absolute", top: 0, left: 0, zIndex: 2 }} />
+      <canvas ref={graphRef} style={{ width: "100%", height: `${height}px`,  position: "absolute", top: 0, left: 0, zIndex: 2 }} />
     </div>
   );
 };
