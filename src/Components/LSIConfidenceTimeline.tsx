@@ -1,0 +1,159 @@
+import { Chart as ChartJS, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js'
+import { Line } from 'react-chartjs-2'
+import { useEffect, useRef, useState } from 'react'
+
+ChartJS.register(LinearScale, PointElement, LineElement, Title, Tooltip, Legend)
+
+interface Meta {
+	[key: string]: number[]
+}
+
+interface DataState {
+	meta: Meta
+}
+
+interface Props {
+	chartData: DataState
+}
+
+const THRESHOLD = 0.7
+
+function lsiColor(label: string) {
+	let hash = 0
+	for (let i = 0; i < label.length; i++) {
+		hash = label.charCodeAt(i) + ((hash << 5) - hash)
+	}
+
+	const hue = Math.abs(hash) % 360
+	return `hsl(${hue}, 70%, 60%)`
+}
+
+// const LSI_COLORS: Record<string, string> = {
+// 	'Blood Products': 'white',
+// 	'Airway & Respiration': 'cyan',
+// 	'Bleeding Control': 'red',
+// 	'Chest Decompression': 'orange',
+// }
+
+type Point = { x: number; y: number }
+
+const LSIConfidenceTimeline = ({ chartData }: Props) => {
+	const MAX_POINTS = 20
+
+	const [series, setSeries] = useState<Record<string, Point[]>>({})
+	const timeRef = useRef(0)
+
+	const signalKeys = Object.keys(chartData.meta).filter(k => k.startsWith('lsi_') && !k.includes('sampling'))
+
+	const samplingRate = chartData.meta.sampling_rate?.[0] ?? 1
+	const dt = 1 / samplingRate
+
+	// Initialize buffers once (or when LSI set changes)
+	useEffect(() => {
+		const init: Record<string, Point[]> = {}
+		signalKeys.forEach(k => (init[k] = []))
+		init.__threshold__ = []
+		setSeries(init)
+		timeRef.current = 0
+	}, [signalKeys.join('|')])
+
+	// Append ONLY the latest value when data updates
+	useEffect(() => {
+		setSeries(prev => {
+			const updated = { ...prev }
+
+			signalKeys.forEach(key => {
+				const arr = chartData.meta[key]
+				if (!arr || arr.length === 0) return
+
+				const lastValue = arr[arr.length - 1]
+
+				const next = [...(updated[key] || []), { x: timeRef.current, y: lastValue }]
+				updated[key] = next
+				// updated[key] = next.length > MAX_POINTS ? next.slice(1) : next
+			})
+
+			const tNext = [...(updated.__threshold__ || []), { x: timeRef.current, y: THRESHOLD }]
+			updated.__threshold__ = tNext
+			// updated.__threshold__ = tNext.length > MAX_POINTS ? tNext.slice(1) : tNext
+
+			return updated
+		})
+
+		timeRef.current += dt
+	}, [chartData])
+
+	const datasets = [
+		...signalKeys.map(key => {
+			const label = key.replace('lsi_', '').replaceAll('_', ' ')
+			return {
+				label,
+				data: series[key] || [],
+				borderColor: lsiColor(label),
+				backgroundColor: 'transparent',
+				tension: 0.4,
+				borderWidth: 2,
+				pointRadius: 0,
+			}
+		}),
+		{
+			label: 'Decision Threshold',
+			data: series.__threshold__ || [],
+			borderColor: 'green',
+			borderDash: [6, 6],
+			borderWidth: 2,
+			pointRadius: 0,
+			tension: 0,
+		},
+	]
+
+	return (
+		<div style={{ height: '400px', margin: '20px auto' }}>
+			<Line
+				data={{ datasets }}
+				options={{
+					responsive: true,
+					maintainAspectRatio: false,
+					plugins: {
+						legend: {
+							labels: { color: 'silver' },
+						},
+						title: {
+							display: true,
+							text: 'LSI Confidence Over Time',
+							color: 'silver',
+						},
+						tooltip: {
+							enabled: true,
+						},
+					},
+					scales: {
+						x: {
+							type: 'linear',
+							title: {
+								display: true,
+								text: 'Time',
+								color: 'silver',
+							},
+							ticks: { color: 'silver' },
+							grid: { color: 'rgba(100,100,100,0.7)' },
+						},
+						y: {
+							min: 0,
+							max: 1.2,
+							title: {
+								display: true,
+								text: 'Confidence',
+								color: 'silver',
+							},
+							ticks: { color: 'silver' },
+							grid: { color: 'rgba(100,100,100,0.7)' },
+						},
+					},
+				}}
+			/>
+		</div>
+	)
+}
+
+export default LSIConfidenceTimeline

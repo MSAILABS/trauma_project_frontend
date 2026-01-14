@@ -1,9 +1,11 @@
 import axios from 'axios'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-// import MultiSignalCharts from './Components/barChatNew'
+import MultiSignalCharts from './Components/barChatNew'
 import MultiSignalGraph from './Components/graphNew'
 import WaitingForData from './Components/waiting'
+import PlotGraphs from './Components/PlotGraphs'
+import LSIConfidenceTimeline from './Components/LSIConfidenceTimeline'
 
 // Define types
 interface Signals {
@@ -16,7 +18,14 @@ interface Meta {
 
 interface DataState {
 	signals: Signals
+	raw_signals: Signals
 	meta: Meta
+	fft_frequencies: number[][]
+	fft_magnitude: number[][]
+	mfcc: number[][][]
+	spectrogram_time_bins: number[][]
+	spectrogram_freq_bins: number[][]
+	spectrogram_power: number[][][]
 }
 
 const MAX_POINTS = 1000 // keep last N points per signal
@@ -25,41 +34,56 @@ const NewApp = () => {
 	const navigate = useNavigate()
 	const [dataState, setDataState] = useState<DataState>({
 		signals: {},
+		raw_signals: {},
 		meta: {},
+		fft_frequencies: [],
+		fft_magnitude: [],
+		mfcc: [],
+		spectrogram_time_bins: [],
+		spectrogram_freq_bins: [],
+		spectrogram_power: [],
 	})
+	// const [showAllLineCharts, setShowAllLinesCharts] = useState(true)
 
 	const getData = async () => {
 		try {
 			const token = localStorage.getItem('token')
 			const res = await axios.get(`${import.meta.env.VITE_API_URL}data/get_array`, {
 				headers: {
-					// The format must be "Bearer " followed by the token
 					Authorization: `Bearer ${token}`,
 				},
 			})
-			const newSignals: Signals = res.data.data.signals || {}
-			const newMetaRaw: { [key: string]: any } = res.data.data.meta || {}
 
 			console.log(res)
+			const newSignals: Signals = res.data.data.signals || {}
+			const newMetaRaw: { [key: string]: any } = res.data.data.meta || {}
+			const newRawSignals: Signals = res.data.data.raw_signals || {}
 
 			setDataState(prev => {
 				const updatedSignals: Signals = { ...prev.signals }
+				const updatedRawSignals: Signals = { ...prev.raw_signals }
 				const updatedMeta: Meta = { ...prev.meta }
 
-				// Update signals
+				// Update normalized signals
 				Object.keys(newSignals).forEach(key => {
-					if (key.endsWith('_time')) return // skip _time keys
-
+					if (key.endsWith('_time')) return
 					const prevArray = updatedSignals[key] || []
 					const combined = [...prevArray, ...newSignals[key]]
-
 					updatedSignals[key] = combined.length > MAX_POINTS ? combined.slice(combined.length - MAX_POINTS) : combined
 				})
 
-				// Update meta separately, key by key
+				// Update raw signals
+				Object.keys(newRawSignals).forEach(key => {
+					if (key.endsWith('_time')) return
+					const prevArray = updatedRawSignals[key] || []
+					const combined = [...prevArray, ...newRawSignals[key]]
+					updatedRawSignals[key] = combined.length > MAX_POINTS ? combined.slice(combined.length - MAX_POINTS) : combined
+				})
+
+				// Update meta
 				Object.keys(newMetaRaw).forEach(metaKey => {
 					if (metaKey === 'sampling_rate') {
-						updatedMeta[metaKey] = [newMetaRaw[metaKey]] // keep single value or handle as needed
+						updatedMeta[metaKey] = [newMetaRaw[metaKey]]
 						return
 					}
 					if (metaKey === 'description') {
@@ -67,21 +91,49 @@ const NewApp = () => {
 						updatedMeta[metaKey] = [...prevArray, newMetaRaw[metaKey]].slice(-MAX_POINTS)
 						return
 					}
-
-					// For other meta keys
 					const prevArray = updatedMeta[metaKey] || []
-					const value = newMetaRaw[metaKey] // true/false or value
-					const repeated = Array(Object.values(newSignals)[0]?.length || 1).fill(value) // repeat to match new signal segment length
-
+					const value = newMetaRaw[metaKey]
+					const repeated = Array(Object.values(newSignals)[0]?.length || 1).fill(value)
 					updatedMeta[metaKey] = [...prevArray, ...repeated].slice(-MAX_POINTS)
 				})
 
-				console.log(updatedSignals)
-				console.log(updatedMeta)
+				let fft_frequencies = []
+				let fft_magnitude = []
+				let mfcc = []
+				let spectrogram_time_bins = []
+				let spectrogram_freq_bins = []
+				let spectrogram_power = []
+
+				try {
+					const repeatLength = updatedMeta[Object.keys(updatedMeta)[0]].length
+
+					fft_frequencies = Array(repeatLength).fill(res.data.data.fft_frequencies || [])
+					fft_magnitude = Array(repeatLength).fill(res.data.data.fft_magnitude || [])
+					mfcc = Array(repeatLength).fill(res.data.data.mfcc || [])
+					spectrogram_time_bins = Array(repeatLength).fill(res.data.data.spectrogram_time_bins || [])
+					spectrogram_freq_bins = Array(repeatLength).fill(res.data.data.spectrogram_freq_bins || [])
+					spectrogram_power = Array(repeatLength).fill(res.data.data.spectrogram_power || [])
+				} catch (err) {
+					fft_frequencies = [res.data.data.fft_frequencies || []]
+					fft_magnitude = [res.data.data.fft_magnitude || []]
+					mfcc = [res.data.data.mfcc || []]
+					spectrogram_time_bins = [res.data.data.spectrogram_time_bins || []]
+					spectrogram_freq_bins = [res.data.data.spectrogram_freq_bins || []]
+					spectrogram_power = [res.data.data.spectrogram_power || []]
+				}
+
+				console.log('new check', spectrogram_power, res.data.data.spectrogram_power)
 
 				return {
 					signals: updatedSignals,
+					raw_signals: updatedRawSignals,
 					meta: updatedMeta,
+					fft_frequencies,
+					fft_magnitude,
+					mfcc,
+					spectrogram_time_bins,
+					spectrogram_freq_bins,
+					spectrogram_power,
 				}
 			})
 		} catch (err: any) {
@@ -106,12 +158,30 @@ const NewApp = () => {
 	return (
 		<div style={{ textAlign: 'center' }}>
 			<h1>ECG Signals & Meta</h1>
+			{/* <button onClick={() => setShowAllLinesCharts(!showAllLineCharts)}>Show All Line Charts</button> */}
 			{/* <pre>{JSON.stringify(dataState, null, 2)}</pre> */}
 			{/* Render all signal graphs */}
-			{!hasData ? <WaitingForData /> : <MultiSignalGraph signals={dataState.signals} />}
-			{/* <>
+			{!hasData ? (
+				<WaitingForData />
+			) : (
+				<>
+					<MultiSignalGraph
+						signals={dataState.signals}
+						numberOfSignalsToShow={Object.keys(dataState.signals).length}
+					/>
+					<LSIConfidenceTimeline chartData={dataState} />
+					<PlotGraphs
+						signals={dataState.raw_signals}
+						fftFreqs={dataState.fft_frequencies}
+						fftMag={dataState.fft_magnitude}
+						mfcc={dataState.mfcc}
+						spectrogramTime={dataState.spectrogram_time_bins}
+						spectrogramFreq={dataState.spectrogram_freq_bins}
+						spectrogramPower={dataState.spectrogram_power}
+					/>
 					<MultiSignalCharts chartData={dataState} />
-				</> */}
+				</>
+			)}
 		</div>
 	)
 }
