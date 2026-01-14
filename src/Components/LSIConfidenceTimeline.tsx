@@ -38,7 +38,7 @@ function lsiColor(label: string) {
 type Point = { x: number; y: number }
 
 const LSIConfidenceTimeline = ({ chartData }: Props) => {
-	const MAX_POINTS = 20
+	// const MAX_POINTS = 20
 
 	const [series, setSeries] = useState<Record<string, Point[]>>({})
 	const timeRef = useRef(0)
