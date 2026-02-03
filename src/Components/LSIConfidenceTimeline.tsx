@@ -124,7 +124,18 @@ const LSIConfidenceTimeline = ({ chartData }: Props) => {
 							color: 'silver',
 						},
 						tooltip: {
-							enabled: true,
+							enabled: true, // Keep for context
+							displayColors: false, // Clean up the box
+							callbacks: {
+								// Redact the X-axis coordinate from title
+								title: () => '',
+								// Redact the Y-axis coordinate from label
+								label: context => context.dataset.label,
+							},
+						},
+						// Explicitly handle datalabels if the plugin is registered
+						datalabels: {
+							display: false,
 						},
 					},
 					scales: {
@@ -148,6 +159,13 @@ const LSIConfidenceTimeline = ({ chartData }: Props) => {
 							},
 							ticks: { color: 'silver' },
 							grid: { color: 'rgba(100,100,100,0.7)' },
+						},
+					},
+					elements: {
+						point: {
+							radius: 0, // No dots on lines
+							hoverRadius: 0, // No dots on hover
+							hitRadius: 10, // Maintain interaction
 						},
 					},
 				}}
