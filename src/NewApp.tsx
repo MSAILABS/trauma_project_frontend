@@ -6,6 +6,7 @@ import MultiSignalGraph from './Components/graphNew'
 import WaitingForData from './Components/waiting'
 import PlotGraphs from './Components/PlotGraphs'
 import LSIConfidenceTimeline from './Components/LSIConfidenceTimeline'
+import ECGChartJS from './Components/ECGChartJS' // Adjust path accordingly
 
 // Define types
 interface Signals {
@@ -26,6 +27,7 @@ interface DataState {
 	spectrogram_time_bins: number[][]
 	spectrogram_freq_bins: number[][]
 	spectrogram_power: number[][][]
+	second_of_chunks: number
 }
 
 const MAX_POINTS = 1000 // keep last N points per signal
@@ -42,6 +44,7 @@ const NewApp = () => {
 		spectrogram_time_bins: [],
 		spectrogram_freq_bins: [],
 		spectrogram_power: [],
+		second_of_chunks: 2,
 	})
 	// const [showAllLineCharts, setShowAllLinesCharts] = useState(true)
 
@@ -134,6 +137,7 @@ const NewApp = () => {
 					spectrogram_time_bins,
 					spectrogram_freq_bins,
 					spectrogram_power,
+					second_of_chunks: 2,
 				}
 			})
 		} catch (err: any) {
@@ -149,7 +153,7 @@ const NewApp = () => {
 	useEffect(() => {
 		console.log('started')
 		// getData();
-		const interval = setInterval(getData, 2000)
+		const interval = setInterval(getData, dataState.second_of_chunks * 1000)
 		return () => clearInterval(interval)
 	}, [])
 
@@ -169,6 +173,9 @@ const NewApp = () => {
 						signals={dataState.signals}
 						numberOfSignalsToShow={Object.keys(dataState.signals).length}
 					/>
+					<div style={{ maxWidth: '95vw', margin: '0 auto' }}>
+						<ECGChartJS signals={dataState.raw_signals} />
+					</div>
 					<LSIConfidenceTimeline chartData={dataState} />
 					<PlotGraphs
 						signals={dataState.raw_signals}
