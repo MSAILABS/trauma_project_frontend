@@ -2,27 +2,31 @@ import React from 'react'
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, type ChartOptions } from 'chart.js'
 import { Line } from 'react-chartjs-2'
 
-// Register necessary Chart.js components
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend)
 
 interface ECGChartProps {
 	signals: { [key: string]: number[] }
-	title?: string
+	duration?: number // Time in seconds for the full width of the graph
 }
 
-const ECGChartJS: React.FC<ECGChartProps> = ({ signals }) => {
-	// Common options for high-performance ECG rendering
+const ECGChartJS: React.FC<ECGChartProps> = ({ signals, duration = 2 }) => {
 	const commonOptions: ChartOptions<'line'> = {
 		responsive: true,
 		maintainAspectRatio: false,
-		animation: false, // Set to false for real-time performance
+		// Enabling animation for the "sliding" effect
+		animation: {
+			duration: 300, // Smooth transition when data shifts
+			easing: 'linear',
+		},
 		elements: {
 			point: {
-				radius: 0, // No dots on lines
-				hoverRadius: 0, // No dots on hover
-				hitRadius: 10, // Maintain interaction \
-			}, // Hide points for a clean line
-			line: { tension: 0.1, borderWidth: 1.5 },
+				radius: 0,
+				hoverRadius: 0,
+			},
+			line: {
+				tension: 0, // Smooth organic waveform
+				borderWidth: 2,
+			},
 		},
 		scales: {
 			x: {
@@ -31,6 +35,9 @@ const ECGChartJS: React.FC<ECGChartProps> = ({ signals }) => {
 				ticks: { display: false }, // Hide labels for smoother look
 			},
 			y: {
+				// Fixed range ensures the graph doesn't "jump" vertically
+				suggestedMin: -1,
+				suggestedMax: 1,
 				beginAtZero: false,
 				grid: { color: 'rgba(255, 0, 0, 0.1)' }, // Mimic ECG paper grid
 			},
@@ -67,16 +74,29 @@ const ECGChartJS: React.FC<ECGChartProps> = ({ signals }) => {
 	}
 
 	return (
-		<div style={{ display: 'flex', flexDirection: 'column', gap: '20px', padding: '20px' }}>
+		<div
+			style={{
+				display: 'flex',
+				flexDirection: 'column',
+				gap: '15px',
+				padding: '20px',
+			}}>
 			{Object.entries(signals).map(([leadName, dataPoints]) => {
+				// To make it look like it's moving right to left,
+				// we only show the last 'N' points based on duration.
+				// Assuming 500Hz sampling rate, points = duration * 500
+				const pointsToShow = duration * 500
+				const displayedData = dataPoints.slice(-pointsToShow)
+
 				const chartData = {
-					labels: new Array(dataPoints.length).fill(''), // X-axis labels (empty for performance)
+					labels: new Array(displayedData.length).fill(''),
 					datasets: [
 						{
 							label: `Lead ${leadName}`,
-							data: dataPoints,
-							borderColor: '#00f2ff', // ECG Pink/Red
-							backgroundColor: 'rgba(30, 118, 233, 0.5)',
+							data: displayedData,
+							borderColor: '#00f2ff',
+							backgroundColor: 'transparent',
+							fill: false,
 						},
 					],
 				}

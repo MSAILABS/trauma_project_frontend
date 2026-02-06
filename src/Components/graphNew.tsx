@@ -351,7 +351,7 @@ const MultiSignalGraph = ({ signals, maxPoints = 1000, numberOfSignalsToShow = 3
 							signals={signals}
 							maxPoints={maxPoints}
 						/>
-					) : null
+					) : null,
 				)}
 			</div>
 		</>

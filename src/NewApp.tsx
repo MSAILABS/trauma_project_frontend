@@ -1,12 +1,13 @@
 import axios from 'axios'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import MultiSignalCharts from './Components/barChatNew'
-import MultiSignalGraph from './Components/graphNew'
+// import MultiSignalGraph from './Components/graphNew'
+import MultiSignalGraph from './Components/syncGraphs'
 import WaitingForData from './Components/waiting'
 import PlotGraphs from './Components/PlotGraphs'
 import LSIConfidenceTimeline from './Components/LSIConfidenceTimeline'
-import ECGChartJS from './Components/ECGChartJS' // Adjust path accordingly
+// import ECGChartJS from './Components/ECGChartJS' // Adjust path accordingly
 
 // Define types
 interface Signals {
@@ -30,7 +31,7 @@ interface DataState {
 	second_of_chunks: number
 }
 
-const MAX_POINTS = 1000 // keep last N points per signal
+let MAX_POINTS = 1000 // keep last N points per signal
 
 const NewApp = () => {
 	const navigate = useNavigate()
@@ -46,6 +47,8 @@ const NewApp = () => {
 		spectrogram_power: [],
 		second_of_chunks: 2,
 	})
+	// We use a ref to keep track of the timer so we can clean it up properly
+	const timerRef = useRef<any>(null)
 	// const [showAllLineCharts, setShowAllLinesCharts] = useState(true)
 
 	const getData = async () => {
@@ -57,10 +60,26 @@ const NewApp = () => {
 				},
 			})
 
-			console.log(res)
+			if (res.data.message) {
+				scheduleNext(1)
+				return
+			}
+
 			const newSignals: Signals = res.data.data.signals || {}
 			const newMetaRaw: { [key: string]: any } = res.data.data.meta || {}
 			const newRawSignals: Signals = res.data.data.raw_signals || {}
+
+			if (MAX_POINTS === 1000) {
+				Object.keys(newSignals).forEach(key => {
+					if (key.endsWith('_time')) return
+
+					MAX_POINTS = newSignals[key].length
+				})
+			}
+
+			// 1. Get the chunk duration from the backend
+			const backendChunkSeconds = res.data.data.chunk_seconds || 2
+			// console.log(newSignals, 'newSignals')
 
 			setDataState(prev => {
 				const updatedSignals: Signals = { ...prev.signals }
@@ -125,7 +144,7 @@ const NewApp = () => {
 					spectrogram_power = [res.data.data.spectrogram_power || []]
 				}
 
-				console.log('new check', spectrogram_power, res.data.data.spectrogram_power)
+				// console.log('new check', spectrogram_power, res.data.data.spectrogram_power)
 
 				return {
 					signals: updatedSignals,
@@ -137,25 +156,43 @@ const NewApp = () => {
 					spectrogram_time_bins,
 					spectrogram_freq_bins,
 					spectrogram_power,
-					second_of_chunks: 2,
+					second_of_chunks: backendChunkSeconds,
 				}
 			})
+
+			// 2. Schedule the next call based on the NEW chunk duration
+			scheduleNext(1)
 		} catch (err: any) {
 			if (err.response?.status === 401) {
 				alert('Please login to continue.')
 				navigate('/login')
 			} else {
 				console.error(err)
+
+				scheduleNext(1)
 			}
 		}
 	}
 
+	const scheduleNext = (seconds: number) => {
+		// Clear any existing timer to prevent multiple polling loops
+		if (timerRef.current) clearTimeout(timerRef.current)
+
+		// Schedule next call
+		timerRef.current = setTimeout(() => {
+			getData()
+		}, seconds * 1000)
+	}
+
 	useEffect(() => {
-		console.log('started')
-		// getData();
-		const interval = setInterval(getData, dataState.second_of_chunks * 1000)
-		return () => clearInterval(interval)
-	}, [])
+		// Start the first call
+		getData()
+
+		// Cleanup: stop polling if the user leaves the page
+		return () => {
+			if (timerRef.current) clearTimeout(timerRef.current)
+		}
+	}, []) // Only runs once on mount
 
 	const hasData = Object.keys(dataState.signals).length > 0 && Object.values(dataState.signals)[0].length > 0
 
@@ -169,13 +206,22 @@ const NewApp = () => {
 				<WaitingForData />
 			) : (
 				<>
+					{/* <MultiSignalGraph
+						signals={dataState.signals}
+						numberOfSignalsToShow={Object.keys(dataState.signals).length}
+					/> */}
+
+					{/* <div style={{ maxWidth: '95vw', margin: '0 auto' }}>
+						<ECGChartJS
+							signals={dataState.raw_signals}
+							duration={dataState.second_of_chunks}
+						/>
+					</div> */}
+
 					<MultiSignalGraph
 						signals={dataState.signals}
 						numberOfSignalsToShow={Object.keys(dataState.signals).length}
 					/>
-					<div style={{ maxWidth: '95vw', margin: '0 auto' }}>
-						<ECGChartJS signals={dataState.raw_signals} />
-					</div>
 					<LSIConfidenceTimeline chartData={dataState} />
 					<PlotGraphs
 						signals={dataState.raw_signals}
