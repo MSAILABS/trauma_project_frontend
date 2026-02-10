@@ -39,142 +39,50 @@ function lsiColor(label: string) {
 type Point = { x: number; y: number }
 
 const LSIConfidenceTimeline = ({ chartData }: Props) => {
+	// const MAX_POINTS = 20
+
 	const [series, setSeries] = useState<Record<string, Point[]>>({})
-
-	// Refs for buffering
-	const queueRef = useRef<Record<string, number[]>>({})
-	const lastProcessedLength = useRef<Record<string, number>>({})
-	const renderTimeRef = useRef(0)
-
-	// State to manage the dynamic interval
-	const [playbackInterval, setPlaybackInterval] = useState(1000)
+	const timeRef = useRef(0)
 
 	const signalKeys = Object.keys(chartData.meta).filter(k => k.startsWith('lsi_') && !k.includes('sampling') && !k.includes('description'))
 
-	// Initial setup
+	const samplingRate = chartData.meta.sampling_rate?.[0] ?? 1
+	const dt = 1 / samplingRate
+
+	// Initialize buffers once (or when LSI set changes)
 	useEffect(() => {
-		const init: Record<string, any> = {}
-		signalKeys.forEach(k => {
-			init[k] = []
-			lastProcessedLength.current[k] = 0
-			queueRef.current[k] = []
-		})
-		setSeries({ ...init, __threshold__: [] })
+		const init: Record<string, Point[]> = {}
+		signalKeys.forEach(k => (init[k] = []))
+		init.__threshold__ = []
+		setSeries(init)
+		timeRef.current = 0
 	}, [signalKeys.join('|')])
 
-	// 1. INGESTION: Identify NEW points and calculate the playback speed
+	// Append ONLY the latest value when data updates
 	useEffect(() => {
-		let detectedInterval = playbackInterval
+		setSeries(prev => {
+			const updated = { ...prev }
 
-		signalKeys.forEach(key => {
-			const fullArray = chartData.meta[key] || []
-			const prevLength = lastProcessedLength.current[key] || 0
+			signalKeys.forEach(key => {
+				const arr = chartData.meta[key]
+				if (!arr || arr.length === 0) return
 
-			// Get only the points that were just added in this fetch
-			const newPoints = fullArray.slice(prevLength)
+				const lastValue = arr[arr.length - 1]
 
-			if (newPoints.length > 0) {
-				queueRef.current[key].push(...newPoints)
-				lastProcessedLength.current[key] = fullArray.length
+				const next = [...(updated[key] || []), { x: timeRef.current, y: lastValue }]
+				updated[key] = next
+				// updated[key] = next.length > MAX_POINTS ? next.slice(1) : next
+			})
 
-				// Calculate interval based on second_of_chunks
-				// Interval = (Total Seconds / Total Points in this chunk) * 1000ms
-				const chunkSeconds = chartData.second_of_chunks || 1
-				detectedInterval = chunkSeconds * 1000
-			}
+			const tNext = [...(updated.__threshold__ || []), { x: timeRef.current, y: THRESHOLD }]
+			updated.__threshold__ = tNext
+			// updated.__threshold__ = tNext.length > MAX_POINTS ? tNext.slice(1) : tNext
+
+			return updated
 		})
 
-		if (detectedInterval !== playbackInterval) {
-			setPlaybackInterval(detectedInterval)
-		}
-	}, [chartData, signalKeys])
-
-	// 2. PLAYBACK: Drip data based on the calculated interval
-	useEffect(() => {
-		const intervalId = setInterval(() => {
-			const hasData = signalKeys.some(k => queueRef.current[k].length > 0)
-
-			if (hasData) {
-				setSeries(prev => {
-					const updated = { ...prev }
-					// const dt = (chartData.second_of_chunks || 1) / 10 // Approximation for X-axis spacing
-
-					signalKeys.forEach(key => {
-						const q = queueRef.current[key]
-						if (q.length > 0) {
-							const val = q.shift()!
-							updated[key] = [...updated[key], { x: renderTimeRef.current, y: val }]
-						}
-					})
-
-					updated.__threshold__ = [...updated.__threshold__, { x: renderTimeRef.current, y: THRESHOLD }]
-
-					renderTimeRef.current += playbackInterval / 1000 // Keep X-axis in seconds
-					return updated
-				})
-			}
-		}, playbackInterval)
-
-		return () => clearInterval(intervalId)
-	}, [playbackInterval, signalKeys, chartData.second_of_chunks])
-
-	// 3. STEP 2: PLAYBACK - Take oldest point from buffer and show it
-	// useEffect(() => {
-	// 	const playbackTimer = setInterval(() => {
-	// 		// Check if there is at least one point in the queues to process
-	// 		const hasData = signalKeys.some(k => queueRef.current[k]?.length > 0)
-
-	// 		if (hasData) {
-	// 			setSeries(prev => {
-	// 				const updated = { ...prev }
-
-	// 				signalKeys.forEach(key => {
-	// 					const queue = queueRef.current[key]
-	// 					if (queue && queue.length > 0) {
-	// 						const oldestPoint = queue.shift()! // Remove from buffer
-	// 						updated[key] = [...updated[key], { x: renderTimeRef.current, y: oldestPoint }]
-	// 					}
-	// 				})
-
-	// 				// Handle Threshold line sync
-	// 				updated.__threshold__ = [...updated.__threshold__, { x: renderTimeRef.current, y: THRESHOLD }]
-
-	// 				return updated
-	// 			})
-
-	// 			// Increment time only when a point is actually rendered
-	// 			renderTimeRef.current += dt
-	// 		}
-	// 	}, PLAYBACK_INTERVAL)
-
-	// 	return () => clearInterval(playbackTimer)
-	// }, [signalKeys.join('|'), dt])
-
-	// Append ONLY the latest value when data updates
-	// useEffect(() => {
-	// 	setSeries(prev => {
-	// 		const updated = { ...prev }
-
-	// 		signalKeys.forEach(key => {
-	// 			const arr = chartData.meta[key]
-	// 			if (!arr || arr.length === 0) return
-
-	// 			const lastValue = arr[arr.length - 1]
-
-	// 			const next = [...(updated[key] || []), { x: timeRef.current, y: lastValue }]
-	// 			updated[key] = next
-	// 			// updated[key] = next.length > MAX_POINTS ? next.slice(1) : next
-	// 		})
-
-	// 		const tNext = [...(updated.__threshold__ || []), { x: timeRef.current, y: THRESHOLD }]
-	// 		updated.__threshold__ = tNext
-	// 		// updated.__threshold__ = tNext.length > MAX_POINTS ? tNext.slice(1) : tNext
-
-	// 		return updated
-	// 	})
-
-	// 	timeRef.current += dt
-	// }, [chartData])
+		timeRef.current += dt
+	}, [chartData])
 
 	const datasets = [
 		...signalKeys.map(key => {

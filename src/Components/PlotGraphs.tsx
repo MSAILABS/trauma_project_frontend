@@ -36,7 +36,7 @@ const PlotGraphs: React.FC<GraphProps> = ({
 	const specQueueRef = useRef<{ x: number[]; y: number[]; z: number[][] }[]>([])
 	const specRenderRef = useRef<{ x: number[]; y: number[]; z: number[][] }[]>([])
 
-	const [fftFrame, setFftFrame] = useState<{ x: number[]; y: number[] } | null>(null)
+	// const [fftFrame, setFftFrame] = useState<{ x: number[]; y: number[] } | null>(null)
 	const [mfccFrame, setMfccFrame] = useState<number[][] | null>(null)
 	const [specFrame, setSpecFrame] = useState<{ x: number[]; y: number[]; z: number[][] } | null>(null)
 
@@ -65,7 +65,7 @@ const PlotGraphs: React.FC<GraphProps> = ({
 				const frame = fftQueueRef.current.shift()!
 				fftRenderRef.current.push(frame)
 				if (fftRenderRef.current.length > MAX_POINTS) fftRenderRef.current.shift()
-				setFftFrame(frame)
+				// setFftFrame(frame)
 			}
 			// MFCC
 			if (mfccQueueRef.current.length > 0) {
@@ -104,7 +104,7 @@ const PlotGraphs: React.FC<GraphProps> = ({
 						},
 					]}
 					layout={{
-						title: { text: 'Spectrogram (buffered)' },
+						title: { text: 'Spectrogram' },
 						xaxis: { title: { text: 'Time (s)' } },
 						yaxis: { title: { text: 'Frequency (Hz)' }, range: [0, 100] },
 						plot_bgcolor: '#242424',
@@ -117,7 +117,7 @@ const PlotGraphs: React.FC<GraphProps> = ({
 			)}
 
 			{/* FFT Spectrum */}
-			{fftFrame && (
+			{/* {fftFrame && (
 				<Plot
 					data={[
 						{
@@ -129,7 +129,7 @@ const PlotGraphs: React.FC<GraphProps> = ({
 						},
 					]}
 					layout={{
-						title: { text: 'FFT Spectrum (buffered)' },
+						title: { text: 'FFT Spectrum' },
 						xaxis: { title: { text: 'Frequency (Hz)' } },
 						yaxis: { title: { text: 'Magnitude' } },
 						plot_bgcolor: '#242424',
@@ -139,7 +139,7 @@ const PlotGraphs: React.FC<GraphProps> = ({
 						height: 600,
 					}}
 				/>
-			)}
+			)} */}
 
 			{/* MFCC Heatmap */}
 			{mfccFrame && (
@@ -152,7 +152,7 @@ const PlotGraphs: React.FC<GraphProps> = ({
 						},
 					]}
 					layout={{
-						title: { text: 'MFCC Coefficients (buffered)' },
+						title: { text: 'MFCC Coefficients' },
 						xaxis: { title: { text: 'Time Frames' } },
 						yaxis: { title: { text: 'MFCC Index' } },
 						plot_bgcolor: '#242424',
