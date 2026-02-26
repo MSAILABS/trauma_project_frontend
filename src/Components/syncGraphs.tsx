@@ -237,12 +237,23 @@ const MultiSignalGraph = ({ signals, maxPoints = 1000, rowHeight = 100, numberOf
 					const startX = pointsToPad * xStep
 
 					// Constants from your original code
-					const midValue = 0.005
-					const amplitude = 0.02
-					const safeAmplitude = amplitude < 0.02 ? 0.02 : amplitude
-					// const safeAmplitude = amplitude
-					const gain = 2
-					const scaleY = (rowHeight * 0.45 * gain) / safeAmplitude
+					// const midValue = 0.005
+					// const amplitude = 0.02
+					// const safeAmplitude = amplitude < 0.02 ? 0.02 : amplitude
+					// // const safeAmplitude = amplitude
+					// const gain = 2
+					// const scaleY = (rowHeight * 0.45 * gain) / safeAmplitude
+
+					// --- NEW DRAWING LOGIC ---
+					// Standard normalized data centers at 0
+					const midValue = 0; 
+
+					// Standard normalized data operates between -1 and 1
+					const amplitude = 1; 
+
+					// This scales a value of 1 or -1 to take up 45% of the lane height.
+					// This leaves a clean 5% visual padding at the top and bottom of the lane so the line never touches the borders.
+					const scaleY = (rowHeight * 0.45) / amplitude;
 
 					// old
 					// Normalize Y relative to the specific Row's midY
@@ -281,7 +292,8 @@ const MultiSignalGraph = ({ signals, maxPoints = 1000, rowHeight = 100, numberOf
 
 					for (let i = 1; i < buffer.length; i++) {
 						const currX = startX + i * xStep
-						const currY = normalizeY(buffer[i] < -1 ? -1 : buffer[i] > 1 ? 1 : buffer[i])
+						// const currY = normalizeY(buffer[i] < -1 ? -1 : buffer[i] > 1 ? 1 : buffer[i])
+						const currY = normalizeY(buffer[i])
 
 						if (currY < minY) minY = currY
 						if (currY > maxY) maxY = currY
