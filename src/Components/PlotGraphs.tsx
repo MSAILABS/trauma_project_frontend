@@ -13,6 +13,7 @@ interface GraphProps {
 	spectrogramTime?: number[][]
 	spectrogramFreq?: number[][]
 	spectrogramPower?: number[][][]
+	chunkSeconds?: number // --- NEW: Added prop for dynamic timing
 }
 
 const MAX_POINTS = 100 // how many frames to keep visible
@@ -25,29 +26,30 @@ const PlotGraphs: React.FC<GraphProps> = ({
 	spectrogramTime = [[]],
 	spectrogramFreq = [[]],
 	spectrogramPower = [[]],
+	chunkSeconds = 5, // --- NEW: Default fallback to 5 seconds
 }) => {
 	// --- Buffers ---
-	const fftQueueRef = useRef<{ x: number[]; y: number[] }[]>([])
-	const fftRenderRef = useRef<{ x: number[]; y: number[] }[]>([])
+	// const fftQueueRef = useRef<{ x: number[]; y: number[] }[]>([])
+	// const fftRenderRef = useRef<{ x: number[]; y: number[] }[]>([])
 
-	const mfccQueueRef = useRef<number[][][]>([])
-	const mfccRenderRef = useRef<number[][][]>([])
+	// const mfccQueueRef = useRef<number[][][]>([])
+	// const mfccRenderRef = useRef<number[][][]>([])
 
 	const specQueueRef = useRef<{ x: number[]; y: number[]; z: number[][] }[]>([])
 	const specRenderRef = useRef<{ x: number[]; y: number[]; z: number[][] }[]>([])
 
 	// const [fftFrame, setFftFrame] = useState<{ x: number[]; y: number[] } | null>(null)
-	const [mfccFrame, setMfccFrame] = useState<number[][] | null>(null)
+	// const [mfccFrame, setMfccFrame] = useState<number[][] | null>(null)
 	const [specFrame, setSpecFrame] = useState<{ x: number[]; y: number[]; z: number[][] } | null>(null)
 
 	// --- Step 1: push new props into queues ---
 	useEffect(() => {
-		if (fftFreqs.length > 0 && fftMag.length > 0) {
-			fftQueueRef.current.push({ x: fftFreqs[0], y: fftMag[0] })
-		}
-		if (mfcc.length > 0) {
-			mfccQueueRef.current.push(mfcc[0])
-		}
+		// if (fftFreqs.length > 0 && fftMag.length > 0) {
+		// 	fftQueueRef.current.push({ x: fftFreqs[0], y: fftMag[0] })
+		// }
+		// if (mfcc.length > 0) {
+		// 	mfccQueueRef.current.push(mfcc[0])
+		// }
 		if (spectrogramTime.length > 0 && spectrogramFreq.length > 0 && spectrogramPower.length > 0) {
 			specQueueRef.current.push({
 				x: spectrogramTime[0],
@@ -57,23 +59,26 @@ const PlotGraphs: React.FC<GraphProps> = ({
 		}
 	}, [fftFreqs, fftMag, mfcc, spectrogramTime, spectrogramFreq, spectrogramPower])
 
-	// --- Step 2: consume from queue on interval ---
+	// --- Step 2: consume from queue on EXACT backend interval ---
 	useEffect(() => {
+		// Convert the backend seconds to milliseconds
+		const chunkDurationMs = chunkSeconds * 1000
+
 		const interval = setInterval(() => {
 			// FFT
-			if (fftQueueRef.current.length > 0) {
-				const frame = fftQueueRef.current.shift()!
-				fftRenderRef.current.push(frame)
-				if (fftRenderRef.current.length > MAX_POINTS) fftRenderRef.current.shift()
-				// setFftFrame(frame)
-			}
+			// if (fftQueueRef.current.length > 0) {
+			// 	const frame = fftQueueRef.current.shift()!
+			// 	fftRenderRef.current.push(frame)
+			// 	if (fftRenderRef.current.length > MAX_POINTS) fftRenderRef.current.shift()
+			// 	setFftFrame(frame)
+			// }
 			// MFCC
-			if (mfccQueueRef.current.length > 0) {
-				const frame = mfccQueueRef.current.shift()!
-				mfccRenderRef.current.push(frame)
-				if (mfccRenderRef.current.length > MAX_POINTS) mfccRenderRef.current.shift()
-				setMfccFrame(frame)
-			}
+			// if (mfccQueueRef.current.length > 0) {
+			// 	const frame = mfccQueueRef.current.shift()!
+			// 	mfccRenderRef.current.push(frame)
+			// 	if (mfccRenderRef.current.length > MAX_POINTS) mfccRenderRef.current.shift()
+			// 	setMfccFrame(frame)
+			// }
 			// Spectrogram
 			if (specQueueRef.current.length > 0) {
 				const frame = specQueueRef.current.shift()!
@@ -81,9 +86,10 @@ const PlotGraphs: React.FC<GraphProps> = ({
 				if (specRenderRef.current.length > MAX_POINTS) specRenderRef.current.shift()
 				setSpecFrame(frame)
 			}
-		}, 1000) // consume one frame per second
+		}, chunkDurationMs) // --- THE FIX: Drains the queue at the exact speed of your chunks
+
 		return () => clearInterval(interval)
-	}, [])
+	}, [chunkSeconds]) // Re-run interval if backend changes chunk timing
 
 	if (!signals || Object.keys(signals).length === 0) {
 		return <p>No signal data available</p>
@@ -106,7 +112,7 @@ const PlotGraphs: React.FC<GraphProps> = ({
 					layout={{
 						title: { text: 'Spectrogram' },
 						xaxis: { title: { text: 'Time (s)' } },
-						yaxis: { title: { text: 'Frequency (Hz)' }, range: [0, 100] },
+						yaxis: { title: { text: 'Frequency (Hz)' }},
 						plot_bgcolor: '#242424',
 						paper_bgcolor: '#242424',
 						font: { color: 'white' },
@@ -142,7 +148,7 @@ const PlotGraphs: React.FC<GraphProps> = ({
 			)} */}
 
 			{/* MFCC Heatmap */}
-			{mfccFrame && (
+			{/* {mfccFrame && (
 				<Plot
 					data={[
 						{
@@ -162,7 +168,7 @@ const PlotGraphs: React.FC<GraphProps> = ({
 						height: 600,
 					}}
 				/>
-			)}
+			)} */}
 		</div>
 	)
 }

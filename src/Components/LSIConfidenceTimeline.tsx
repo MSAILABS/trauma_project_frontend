@@ -39,6 +39,7 @@ function lsiColor(label: string) {
 type Point = { x: number; y: number }
 
 const LSIConfidenceTimeline = ({ chartData }: Props) => {
+	console.log(chartData)
 	// const MAX_POINTS = 20
 
 	const [series, setSeries] = useState<Record<string, Point[]>>({})
@@ -46,8 +47,11 @@ const LSIConfidenceTimeline = ({ chartData }: Props) => {
 
 	const signalKeys = Object.keys(chartData.meta).filter(k => k.startsWith('lsi_') && !k.includes('sampling') && !k.includes('description'))
 
-	const samplingRate = chartData.meta.sampling_rate?.[0] ?? 1
-	const dt = 1 / samplingRate
+	// --- THE FIX: Create a waiting room for incoming data ---
+	const queueRef = useRef<Record<string, number>[]>([])
+
+	// const samplingRate = chartData.meta.sampling_rate?.[0] ?? 1
+	// const dt = 1 / samplingRate
 
 	// Initialize buffers once (or when LSI set changes)
 	useEffect(() => {
@@ -56,33 +60,83 @@ const LSIConfidenceTimeline = ({ chartData }: Props) => {
 		init.__threshold__ = []
 		setSeries(init)
 		timeRef.current = 0
+		queueRef.current = [] // Reset the waiting room on init
 	}, [signalKeys.join('|')])
 
-	// Append ONLY the latest value when data updates
+	// --- STEP 1: INGESTION ---
+	// When Axios gets new data, put it in the queue. DO NOT update the chart yet.
 	useEffect(() => {
-		setSeries(prev => {
-			const updated = { ...prev }
+		const newDataPoint: Record<string, number> = {}
+		let hasData = false
 
-			signalKeys.forEach(key => {
-				const arr = chartData.meta[key]
-				if (!arr || arr.length === 0) return
-
-				const lastValue = arr[arr.length - 1]
-
-				const next = [...(updated[key] || []), { x: timeRef.current, y: lastValue }]
-				updated[key] = next
-				// updated[key] = next.length > MAX_POINTS ? next.slice(1) : next
-			})
-
-			const tNext = [...(updated.__threshold__ || []), { x: timeRef.current, y: THRESHOLD }]
-			updated.__threshold__ = tNext
-			// updated.__threshold__ = tNext.length > MAX_POINTS ? tNext.slice(1) : tNext
-
-			return updated
+		signalKeys.forEach(key => {
+			const arr = chartData.meta[key]
+			if (arr && arr.length > 0) {
+				newDataPoint[key] = arr[arr.length - 1]
+				hasData = true
+			}
 		})
 
-		timeRef.current += dt
+		if (hasData) {
+			queueRef.current.push(newDataPoint)
+		}
 	}, [chartData])
+
+	// --- STEP 2: PACING ---
+	// Drain the queue at the exact speed of your chunks (e.g., every 5 seconds)
+	useEffect(() => {
+		// Use the backend chunk duration, fallback to 5 seconds if undefined
+		const chunkDurationMs = (chartData.second_of_chunks || 5) * 1000
+
+		const intervalId = setInterval(() => {
+			if (queueRef.current.length > 0) {
+				// Pop the oldest point waiting in line
+				const pointToDraw = queueRef.current.shift()!
+
+				setSeries(prev => {
+					const updated = { ...prev }
+					signalKeys.forEach(key => {
+						if (pointToDraw[key] !== undefined) {
+							updated[key] = [...(updated[key] || []), { x: timeRef.current, y: pointToDraw[key] }]
+						}
+					})
+					updated.__threshold__ = [...(updated.__threshold__ || []), { x: timeRef.current, y: THRESHOLD }]
+					return updated
+				})
+
+				// Move the X-axis forward by the chunk duration
+				timeRef.current += chartData.second_of_chunks || 5
+			}
+		}, chunkDurationMs)
+
+		return () => clearInterval(intervalId)
+	}, [chartData.second_of_chunks, signalKeys.join('|')])
+
+	// Append ONLY the latest value when data updates
+	// useEffect(() => {
+	// 	setSeries(prev => {
+	// 		const updated = { ...prev }
+
+	// 		signalKeys.forEach(key => {
+	// 			const arr = chartData.meta[key]
+	// 			if (!arr || arr.length === 0) return
+
+	// 			const lastValue = arr[arr.length - 1]
+
+	// 			const next = [...(updated[key] || []), { x: timeRef.current, y: lastValue }]
+	// 			updated[key] = next
+	// 			// updated[key] = next.length > MAX_POINTS ? next.slice(1) : next
+	// 		})
+
+	// 		const tNext = [...(updated.__threshold__ || []), { x: timeRef.current, y: THRESHOLD }]
+	// 		updated.__threshold__ = tNext
+	// 		// updated.__threshold__ = tNext.length > MAX_POINTS ? tNext.slice(1) : tNext
+
+	// 		return updated
+	// 	})
+
+	// 	timeRef.current += dt
+	// }, [chartData])
 
 	const datasets = [
 		...signalKeys.map(key => {

@@ -35,9 +35,12 @@ interface MultiSignalGraphProps {
 	maxPoints?: number
 	rowHeight?: number
 	numberOfSignalsToShow?: number
+	chunkSeconds?: number
 }
 
-const MultiSignalGraph = ({ signals, maxPoints = 1000, rowHeight = 100, numberOfSignalsToShow = 3 }: MultiSignalGraphProps) => {
+const MultiSignalGraph = ({ signals, maxPoints = 1000, rowHeight = 100, numberOfSignalsToShow = 3, chunkSeconds = 5 }: MultiSignalGraphProps) => {
+	
+	console.log("max point", Object.values(signals)[0]?.length)
 	// 1. Determine which signals to show
 	const signalKeys = useMemo(() => {
 		console.log(signals)
@@ -67,9 +70,14 @@ const MultiSignalGraph = ({ signals, maxPoints = 1000, rowHeight = 100, numberOf
 	}, [signalKeys])
 
 	// Animation Loop Refs
+	// const rAFRef = useRef<number | null>(null)
+	// const lastUpdateTimeRef = useRef<number>(0)
+	// const animationInterval = 16
+
+	// Animation Loop Refs
 	const rAFRef = useRef<number | null>(null)
-	const lastUpdateTimeRef = useRef<number>(0)
-	const animationInterval = 16
+	const lastFrameTimeRef = useRef<number>(performance.now())
+	const fractionalPointsRef = useRef<{ [key: string]: number }>({}) // Tracks decimal points
 
 	// -------------------------
 	// STEP 1: Draw Static Background Grid (Runs once per layout change)
@@ -178,51 +186,106 @@ const MultiSignalGraph = ({ signals, maxPoints = 1000, rowHeight = 100, numberOf
 
 		const draw = (timestamp: number) => {
 			rAFRef.current = requestAnimationFrame(draw)
-			const elapsed = timestamp - lastUpdateTimeRef.current
 
-			if (elapsed > animationInterval) {
-				lastUpdateTimeRef.current = timestamp - (elapsed % animationInterval)
+			// 1. Calculate exactly how many milliseconds passed since the last frame
+			const deltaTime = timestamp - lastFrameTimeRef.current
+			lastFrameTimeRef.current = timestamp
 
-				// 1. Clear the entire large canvas
-				ctx.clearRect(0, 0, width, totalHeight)
+			// 2. Clear the canvas
+			ctx.clearRect(0, 0, width, totalHeight)
 
-				// 2. Loop through every signal and draw it in its specific "lane"
-				signalKeys.forEach((key, index) => {
-					const yOffset = index * rowHeight
-					const midY = yOffset + rowHeight / 2
+			signalKeys.forEach((key, index) => {
+				const yOffset = index * rowHeight
+				const midY = yOffset + rowHeight / 2
 
-					// Get Buffers
-					// if (!dataQueueRef.current[key]) dataQueueRef.current[key] = []
-					// if (!renderBufferRef.current[key]) renderBufferRef.current[key] = []
+				const queue = dataQueueRef.current[key]
+				const buffer = renderBufferRef.current[key]
 
-					const queue = dataQueueRef.current[key]
-					const buffer = renderBufferRef.current[key]
+				// --- YOUR MATH FIX GOES HERE ---
+				// Get the total points from the last received chunk (fallback to 2500)
+				const pointsInLastChunk = prevDataRef.current[key]?.length || 2500
 
-					let pointsToProcess = 1
+				// Calculate points per millisecond based on the backend's required time
+				const pointsPerMs = pointsInLastChunk / (chunkSeconds * 1000)
 
-					// If queue is backed up (e.g., > 50 points), process 2 points per frame
-					// so we slowly speed up to real-time without skipping data.
-					// if (queue.length > 100) pointsToProcess = 3
-					// if (queue.length > 500) pointsToProcess = 10 // Major lag recovery
+				// Calculate exactly how many points to draw this frame + any leftovers from last frame
+				const currentFraction = fractionalPointsRef.current[key] || 0
+				const exactPoints = (deltaTime * pointsPerMs) + currentFraction
 
-					for (let p = 0; p < pointsToProcess; p++) {
-						if (queue.length > 0) {
-							const point = queue.shift()!
-							buffer.push(point)
-							if (buffer.length > maxPoints) buffer.shift()
-						}
+				// We can only pop whole numbers from an array
+				let pointsToProcess = Math.floor(exactPoints)
+
+				// Save the decimal remainder for the next frame so we never lose data
+				fractionalPointsRef.current[key] = exactPoints - pointsToProcess
+
+				// Safety net: Don't pop more than we have in the queue
+				if (pointsToProcess > queue.length) {
+					pointsToProcess = queue.length
+				}
+
+				// Pop the exact mathematical amount!
+				for (let p = 0; p < pointsToProcess; p++) {
+					if (queue.length > 0) {
+						buffer.push(queue.shift()!)
+						if (buffer.length > maxPoints) buffer.shift()
 					}
+				}
 
-					// --- DRAWING LOGIC (Same as before) ---
-					if (buffer.length < 2) return
+				// --- DRAWING LOGIC (Keep the rest exactly the same as before) ---
+				if (buffer.length < 2) return
 
-					// Draw center line for this row
-					ctx.beginPath()
-					ctx.strokeStyle = 'rgba(255,255,255,0.1)'
-					ctx.lineWidth = 1
-					ctx.moveTo(0, midY)
-					ctx.lineTo(width, midY)
-					ctx.stroke()
+				ctx.beginPath()
+				ctx.strokeStyle = 'rgba(255,255,255,0.1)'
+				ctx.lineWidth = 1
+				ctx.moveTo(0, midY)
+				ctx.lineTo(width, midY)
+				ctx.stroke()
+			// rAFRef.current = requestAnimationFrame(draw)
+			// const elapsed = timestamp - lastUpdateTimeRef.current
+
+			// if (elapsed > animationInterval) {
+			// 	lastUpdateTimeRef.current = timestamp - (elapsed % animationInterval)
+
+			// 	// 1. Clear the entire large canvas
+			// 	ctx.clearRect(0, 0, width, totalHeight)
+
+			// 	// 2. Loop through every signal and draw it in its specific "lane"
+			// 	signalKeys.forEach((key, index) => {
+			// 		const yOffset = index * rowHeight
+			// 		const midY = yOffset + rowHeight / 2
+
+			// 		// Get Buffers
+			// 		// if (!dataQueueRef.current[key]) dataQueueRef.current[key] = []
+			// 		// if (!renderBufferRef.current[key]) renderBufferRef.current[key] = []
+
+			// 		const queue = dataQueueRef.current[key]
+			// 		const buffer = renderBufferRef.current[key]
+
+			// 		let pointsToProcess = 1
+
+			// 		// If queue is backed up (e.g., > 50 points), process 2 points per frame
+			// 		// so we slowly speed up to real-time without skipping data.
+			// 		// if (queue.length > 100) pointsToProcess = 3
+			// 		// if (queue.length > 500) pointsToProcess = 10 // Major lag recovery
+
+			// 		for (let p = 0; p < pointsToProcess; p++) {
+			// 			if (queue.length > 0) {
+			// 				const point = queue.shift()!
+			// 				buffer.push(point)
+			// 				if (buffer.length > maxPoints) buffer.shift()
+			// 			}
+			// 		}
+
+			// 		// --- DRAWING LOGIC (Same as before) ---
+			// 		if (buffer.length < 2) return
+
+			// 		// Draw center line for this row
+			// 		ctx.beginPath()
+			// 		ctx.strokeStyle = 'rgba(255,255,255,0.1)'
+			// 		ctx.lineWidth = 1
+			// 		ctx.moveTo(0, midY)
+			// 		ctx.lineTo(width, midY)
+			// 		ctx.stroke()
 
 					// Dynamic Scaling (Per Signal)
 					// let minVal = Infinity
@@ -310,7 +373,7 @@ const MultiSignalGraph = ({ signals, maxPoints = 1000, rowHeight = 100, numberOf
 					ctx.lineTo(prevX, prevY)
 					ctx.stroke()
 				})
-			}
+			// }
 		}
 
 		rAFRef.current = requestAnimationFrame(draw)

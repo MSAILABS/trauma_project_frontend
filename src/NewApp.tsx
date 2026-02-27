@@ -221,6 +221,8 @@ const NewApp = () => {
 					<MultiSignalGraph
 						signals={dataState.signals}
 						numberOfSignalsToShow={Object.keys(dataState.signals).length}
+						chunkSeconds={dataState.second_of_chunks}
+						maxPoints={Object.values(dataState.signals)[0]?.length || 2500}
 					/>
 					<LSIConfidenceTimeline chartData={dataState} />
 					<PlotGraphs
@@ -231,6 +233,7 @@ const NewApp = () => {
 						spectrogramTime={dataState.spectrogram_time_bins}
 						spectrogramFreq={dataState.spectrogram_freq_bins}
 						spectrogramPower={dataState.spectrogram_power}
+						chunkSeconds={dataState.second_of_chunks}
 					/>
 					<MultiSignalCharts chartData={dataState} />
 				</>
