@@ -49,7 +49,106 @@ const NewApp = () => {
 	})
 	// We use a ref to keep track of the timer so we can clean it up properly
 	const timerRef = useRef<any>(null)
+	const [processingModel, setProcessingModel] = useState<string | null>(null)
+	const [showModelButtons, setShowModelButtons] = useState(true)
 	// const [showAllLineCharts, setShowAllLinesCharts] = useState(true)
+
+	const resetState = () => {
+		// Clear polling timer
+		if (timerRef.current) {
+			clearTimeout(timerRef.current)
+		}
+
+		// Reset data
+		setDataState({
+			signals: {},
+			raw_signals: {},
+			meta: {},
+			fft_frequencies: [],
+			fft_magnitude: [],
+			mfcc: [],
+			spectrogram_time_bins: [],
+			spectrogram_freq_bins: [],
+			spectrogram_power: [],
+			second_of_chunks: 2,
+		})
+	}
+
+	const handleResetEr3 = async () => {
+		try {
+			const token = localStorage.getItem('token')
+
+			if (!token) {
+				alert('Please login to continue.')
+				navigate('/login')
+				return
+			}
+
+			await axios.post(
+				`${import.meta.env.VITE_API_URL}data/reset_er3`,
+				null,
+				{
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				}
+			)
+		} catch (err: any) {
+			if (err.response?.status === 401) {
+				alert('Please login to continue.')
+				navigate('/login')
+			} else {
+				console.error(err)
+				alert('Failed to reset. Please try again.')
+			}
+		} finally {
+			// Full page refresh after reset
+			window.location.reload()
+		}
+	}
+
+	const handleProcessEr3 = async (modelType: 'rf' | 'poting') => {
+		try {
+			// Reset / refresh component before calling API
+			resetState()
+
+			// Hide RF / poting buttons after first click
+			setShowModelButtons(false)
+
+			setProcessingModel(modelType)
+			const token = localStorage.getItem('token')
+
+			if (!token) {
+				alert('Please login to continue.')
+				navigate('/login')
+				return
+			}
+
+			await axios.post(
+				`${import.meta.env.VITE_API_URL}data/process_er3`,
+				null,
+				{
+					params: { model_type: modelType },
+					headers: {
+						Authorization: `Bearer ${token}`,
+					},
+				}
+			)
+
+			// After processing, restart polling for fresh data
+			getData()
+		} catch (err: any) {
+			if (err.response?.status === 401) {
+				alert('Please login to continue.')
+				navigate('/login')
+			} else {
+				console.error(err)
+				alert('Failed to trigger processing. Please try again.')
+			}
+		} finally {
+			setProcessingModel(null)
+		}
+	}
 
 	const getData = async () => {
 		try {
@@ -199,11 +298,28 @@ const NewApp = () => {
 	return (
 		<div style={{ textAlign: 'center' }}>
 			<h1>ECG Signals & Meta</h1>
+
+			{showModelButtons && (
+				<div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center', gap: '12px' }}>
+					<button
+						onClick={() => handleProcessEr3('rf')}
+						disabled={processingModel !== null}
+					>
+						Old Model
+					</button>
+					<button
+						onClick={() => handleProcessEr3('poting')}
+						disabled={processingModel !== null}
+					>
+						New Model
+					</button>
+				</div>
+			)}
 			{/* <button onClick={() => setShowAllLinesCharts(!showAllLineCharts)}>Show All Line Charts</button> */}
 			{/* <pre>{JSON.stringify(dataState, null, 2)}</pre> */}
 			{/* Render all signal graphs */}
 			{!hasData ? (
-				<WaitingForData />
+				!showModelButtons && <WaitingForData />
 			) : (
 				<>
 					{/* <MultiSignalGraph
@@ -237,6 +353,12 @@ const NewApp = () => {
 					/>
 					<MultiSignalCharts chartData={dataState} />
 				</>
+			)}
+
+			{!showModelButtons && (
+				<div style={{ marginTop: '24px' }}>
+					<button onClick={handleResetEr3}>Reset</button>
+				</div>
 			)}
 		</div>
 	)
