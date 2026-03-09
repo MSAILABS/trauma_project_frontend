@@ -19,22 +19,14 @@ interface Props {
 
 const THRESHOLD = 0.7
 
-function lsiColor(label: string) {
-	let hash = 0
-	for (let i = 0; i < label.length; i++) {
-		hash = label.charCodeAt(i) + ((hash << 5) - hash)
-	}
-
-	const hue = Math.abs(hash) % 360
-	return `hsl(${hue}, 70%, 60%)`
-}
-
-// const LSI_COLORS: Record<string, string> = {
-// 	'Blood Products': 'white',
-// 	'Airway & Respiration': 'cyan',
-// 	'Bleeding Control': 'red',
-// 	'Chest Decompression': 'orange',
-// }
+const LSI_COLOR_PALETTE: string[] = [
+	'#1F77B4', // Deep Blue
+	'#FF7F0E', // Bright Orange
+	'#2CA02C', // Forest Green
+	'#D62728', // Crimson Red
+	'#9467BD', // Purple
+	'#BCBD22', // Gold
+]
 
 type Point = { x: number; y: number }
 
@@ -138,13 +130,27 @@ const LSIConfidenceTimeline = ({ chartData }: Props) => {
 	// 	timeRef.current += dt
 	// }, [chartData])
 
+	// Build a deterministic color map based on the alphabetical order of LSI labels.
+	const lsiLabels = Array.from(
+		new Set(
+			signalKeys.map(key => key.replace('lsi_', '').replaceAll('_', ' ')),
+		),
+	).sort((a, b) => a.localeCompare(b))
+
+	const labelToColor: Record<string, string> = {}
+	lsiLabels.forEach((label, index) => {
+		// Use modulo so we always have a color even if there are
+		// more LSIs than defined colors, and safely handle fewer LSIs too.
+		labelToColor[label] = LSI_COLOR_PALETTE[index % LSI_COLOR_PALETTE.length]
+	})
+
 	const datasets = [
 		...signalKeys.map(key => {
 			const label = key.replace('lsi_', '').replaceAll('_', ' ')
 			return {
 				label,
 				data: series[key] || [],
-				borderColor: lsiColor(label),
+				borderColor: labelToColor[label] || '#1F77B4',
 				backgroundColor: 'transparent',
 				tension: 0.4,
 				borderWidth: 2,

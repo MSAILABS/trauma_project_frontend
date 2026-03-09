@@ -51,6 +51,8 @@ const NewApp = () => {
 	const timerRef = useRef<any>(null)
 	const [processingModel, setProcessingModel] = useState<string | null>(null)
 	const [showModelButtons, setShowModelButtons] = useState(true)
+	const [activeModelType, setActiveModelType] = useState<'rf' | 'poting' | null>(null)
+	const [isPaused, setIsPaused] = useState(false)
 	// const [showAllLineCharts, setShowAllLinesCharts] = useState(true)
 
 	const resetState = () => {
@@ -84,15 +86,11 @@ const NewApp = () => {
 				return
 			}
 
-			await axios.post(
-				`${import.meta.env.VITE_API_URL}data/reset_er3`,
-				null,
-				{
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				}
-			)
+			await axios.post(`${import.meta.env.VITE_API_URL}data/reset_er3`, null, {
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			})
 		} catch (err: any) {
 			if (err.response?.status === 401) {
 				alert('Please login to continue.')
@@ -107,6 +105,48 @@ const NewApp = () => {
 		}
 	}
 
+	const handlePauseEr3 = async () => {
+		try {
+			const token = localStorage.getItem('token')
+			if (!token) {
+				alert('Please login to continue.')
+				navigate('/login')
+				return
+			}
+			await axios.post(`${import.meta.env.VITE_API_URL}data/pause_er3`, null, { headers: { Authorization: `Bearer ${token}` } })
+			setIsPaused(true)
+		} catch (err: any) {
+			if (err.response?.status === 401) {
+				alert('Please login to continue.')
+				navigate('/login')
+			} else {
+				console.error(err)
+				alert('Failed to pause. Please try again.')
+			}
+		}
+	}
+
+	const handleUnpauseEr3 = async () => {
+		try {
+			const token = localStorage.getItem('token')
+			if (!token) {
+				alert('Please login to continue.')
+				navigate('/login')
+				return
+			}
+			await axios.post(`${import.meta.env.VITE_API_URL}data/unpause_er3`, null, { headers: { Authorization: `Bearer ${token}` } })
+			setIsPaused(false)
+		} catch (err: any) {
+			if (err.response?.status === 401) {
+				alert('Please login to continue.')
+				navigate('/login')
+			} else {
+				console.error(err)
+				alert('Failed to unpause. Please try again.')
+			}
+		}
+	}
+
 	const handleProcessEr3 = async (modelType: 'rf' | 'poting') => {
 		try {
 			// Reset / refresh component before calling API
@@ -114,6 +154,8 @@ const NewApp = () => {
 
 			// Hide RF / poting buttons after first click
 			setShowModelButtons(false)
+			setActiveModelType(modelType)
+			setIsPaused(false)
 
 			setProcessingModel(modelType)
 			const token = localStorage.getItem('token')
@@ -124,16 +166,12 @@ const NewApp = () => {
 				return
 			}
 
-			await axios.post(
-				`${import.meta.env.VITE_API_URL}data/process_er3`,
-				null,
-				{
-					params: { model_type: modelType },
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				}
-			)
+			await axios.post(`${import.meta.env.VITE_API_URL}data/process_er3`, null, {
+				params: { model_type: modelType },
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+			})
 
 			// After processing, restart polling for fresh data
 			getData()
@@ -297,21 +335,48 @@ const NewApp = () => {
 
 	return (
 		<div style={{ textAlign: 'center' }}>
-			<h1>ECG Signals & Meta</h1>
+			<h1>
+				ECG Signals & Meta
+				{!showModelButtons && (
+					<div
+						style={{
+							float: 'right',
+							display: 'flex',
+							justifyContent: 'center',
+							gap: '12px',
+							fontSize: '20px',
+							position: 'absolute',
+							top: '40px',
+							right: '10px',
+						}}>
+						{(activeModelType === 'rf' || activeModelType === 'poting') && (
+							<>
+								{isPaused ? <button onClick={handleUnpauseEr3}>Unpause</button> : <button onClick={handlePauseEr3}>Pause</button>}
+								<button onClick={handleResetEr3}>Reset</button>
+							</>
+						)}
+					</div>
+				)}
+			</h1>
 
 			{showModelButtons && (
 				<div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'center', gap: '12px' }}>
 					<button
 						onClick={() => handleProcessEr3('rf')}
-						disabled={processingModel !== null}
-					>
+						disabled={processingModel !== null}>
 						Old Model
 					</button>
 					<button
 						onClick={() => handleProcessEr3('poting')}
-						disabled={processingModel !== null}
-					>
+						disabled={processingModel !== null}>
 						New Model
+					</button>
+					<button
+						onClick={() => {
+							setShowModelButtons(false)
+						}}
+						disabled={processingModel !== null}>
+						Streaming
 					</button>
 				</div>
 			)}
@@ -353,12 +418,6 @@ const NewApp = () => {
 					/>
 					<MultiSignalCharts chartData={dataState} />
 				</>
-			)}
-
-			{!showModelButtons && (
-				<div style={{ marginTop: '24px' }}>
-					<button onClick={handleResetEr3}>Reset</button>
-				</div>
 			)}
 		</div>
 	)
