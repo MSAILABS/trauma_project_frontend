@@ -53,6 +53,7 @@ const NewApp = () => {
 	const [showModelButtons, setShowModelButtons] = useState(true)
 	const [activeModelType, setActiveModelType] = useState<'rf' | 'poting' | null>(null)
 	const [isPaused, setIsPaused] = useState(false)
+	const [bufferKey, setBufferKey] = useState(0)
 	// const [showAllLineCharts, setShowAllLinesCharts] = useState(true)
 
 	const resetState = () => {
@@ -74,6 +75,26 @@ const NewApp = () => {
 			spectrogram_power: [],
 			second_of_chunks: 2,
 		})
+	}
+
+	// Clear only the frontend buffers (signals, meta, LSI timeline) without touching
+	// the backend or stopping polling. Bumping bufferKey remounts the charts so their
+	// internal buffers/queues are cleared as well.
+	const clearBuffer = () => {
+		MAX_POINTS = 1000
+		setDataState({
+			signals: {},
+			raw_signals: {},
+			meta: {},
+			fft_frequencies: [],
+			fft_magnitude: [],
+			mfcc: [],
+			spectrogram_time_bins: [],
+			spectrogram_freq_bins: [],
+			spectrogram_power: [],
+			second_of_chunks: 2,
+		})
+		setBufferKey(k => k + 1)
 	}
 
 	const handleResetEr3 = async () => {
@@ -349,6 +370,7 @@ const NewApp = () => {
 							top: '40px',
 							right: '10px',
 						}}>
+						<button onClick={clearBuffer}>Clear Buffer</button>
 						{(activeModelType === 'rf' || activeModelType === 'poting') && (
 							<>
 								{isPaused ? <button onClick={handleUnpauseEr3}>Unpause</button> : <button onClick={handlePauseEr3}>Pause</button>}
@@ -400,12 +422,13 @@ const NewApp = () => {
 					</div> */}
 
 					<MultiSignalGraph
+						key={`sg-${bufferKey}`}
 						signals={dataState.signals}
 						numberOfSignalsToShow={Object.keys(dataState.signals).length}
 						chunkSeconds={dataState.second_of_chunks}
 						maxPoints={Object.values(dataState.signals)[0]?.length || 2500}
 					/>
-					<LSIConfidenceTimeline chartData={dataState} />
+					<LSIConfidenceTimeline key={`lsi-${bufferKey}`} chartData={dataState} />
 					<PlotGraphs
 						signals={dataState.raw_signals}
 						fftFreqs={dataState.fft_frequencies}
